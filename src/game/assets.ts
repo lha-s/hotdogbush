@@ -9,6 +9,10 @@ export type SpriteKey =
   | 'pattyRaw'
   | 'pattyCooked'
   | 'pattyBurnt'
+  | 'friesRaw'
+  | 'friesCooked'
+  | 'onionRaw'
+  | 'onionCooked'
   | 'bun'
   | 'burgerBun'
   | 'customer1'
@@ -23,6 +27,10 @@ const MANIFEST: Record<SpriteKey, string> = {
   pattyRaw: '/assets/patty-raw.svg',
   pattyCooked: '/assets/patty-cooked.svg',
   pattyBurnt: '/assets/patty-burnt.svg',
+  friesRaw: '/assets/fries-raw.svg',
+  friesCooked: '/assets/fries-cooked.svg',
+  onionRaw: '/assets/onion-raw.svg',
+  onionCooked: '/assets/onion-cooked.svg',
   bun: '/assets/bun.svg',
   burgerBun: '/assets/burger-bun.svg',
   customer1: '/assets/customer-1.svg',

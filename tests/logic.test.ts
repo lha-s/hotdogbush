@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { CASH, COOK, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, UNLOCK } from '../src/game/constants.ts';
+import { CASH, COOK, FRYER_COOK, PAN_COOK, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, UNLOCK } from '../src/game/constants.ts';
 import {
   collectToken,
   createState,
@@ -18,7 +18,9 @@ import {
   servePlate,
   spawnGap,
   startCooking,
+  startFrying,
   startGame,
+  startPan,
   step,
   tapGrill,
   tokenAt,
@@ -272,6 +274,49 @@ describe('serving + cash collection', () => {
     expect(collectToken(s, tok.id)).toBe(PAYOUT.drink);
     expect(s.cash).toBe(PAYOUT.drink);
     expect(s.pending).toBe(0);
+  });
+});
+
+describe('fries (fryer) + onions (pan)', () => {
+  test('fries cook on the fryer band and can start their own plate', () => {
+    const s = playing();
+    expect(startFrying(s, 0)).toBe(true);
+    expect(s.dogs[0].kind).toBe('fries');
+    expect(s.dogs[0].station).toBe('fryer');
+    s.dogs[0].cook = FRYER_COOK.perfectFrom + 0.5; // perfect on the fryer band
+    expect(dropCookedOnPlate(s, s.dogs[0].id, 0)).toBe('ok'); // empty slot -> fries plate
+    expect(s.plates[0]?.fries).toBe('perfect');
+  });
+
+  test('an onion needs a protein on the plate', () => {
+    const s = playing();
+    startPan(s, 0);
+    s.dogs[0].cook = PAN_COOK.perfectFrom + 0.5;
+    expect(dropCookedOnPlate(s, s.dogs[0].id, 0)).toBe('bad'); // no plate/protein
+    placeBun(s); // bun in slot 0, still no sausage
+    expect(dropCookedOnPlate(s, s.dogs[0].id, 0)).toBe('bad');
+  });
+
+  test('grill and fryer slots with the same index do not collide', () => {
+    const s = playing();
+    startCooking(s, 0, 'sausage'); // grill slot 0
+    startFrying(s, 0); // fryer slot 0
+    expect(s.dogs.filter((d) => d.slot === 0)).toHaveLength(2);
+    expect(s.dogs.find((d) => d.station === 'grill')?.kind).toBe('sausage');
+    expect(s.dogs.find((d) => d.station === 'fryer')?.kind).toBe('fries');
+  });
+
+  test('fries payout + matching; onion is a pay modifier', () => {
+    expect(platePayout(plate({ fries: 'perfect' }), order({ fries: true }), 0)).toBe(PAYOUT.friesPerfect);
+    expect(plateMatchesOrder(plate({ fries: 'good' }), order({ fries: true }))).toBe(true);
+    expect(plateMatchesOrder(plate({ bun: true, sausage: 'good' }), order({ sausage: true, fries: true }))).toBe(false);
+    const withOnion = platePayout(plate({ bun: true, sausage: 'perfect', onion: true }), order({ sausage: true, onion: true }), 0);
+    expect(withOnion).toBe(PAYOUT.bun + PAYOUT.perfect + PAYOUT.onion);
+  });
+
+  test('fries only appear in orders after their unlock time', () => {
+    for (let i = 0; i < 20; i++) expect(generateOrder(() => i / 20, UNLOCK.fries - 1).fries).toBe(false);
+    expect(generateOrder(() => 0, UNLOCK.fries).fries).toBe(true);
   });
 });
 

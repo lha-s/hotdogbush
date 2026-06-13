@@ -1,6 +1,6 @@
-import { CASH, COOK, CUSTOMER, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from './constants.ts';
+import { APPLIANCE_COOK, CASH, COOK, CUSTOMER, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from './constants.ts';
 import { customerSlotRect } from './geometry.ts';
-import type { CashToken, Customer, GameState, Grade, Order, Plate } from './types.ts';
+import type { CashToken, CookItem, CookStation, Customer, GameState, Grade, Order, Plate } from './types.ts';
 
 // ---------------------------------------------------------------------------
 // Speed-mode progression (pure, DOM-free, unit-testable)
@@ -65,8 +65,24 @@ export function isBurnt(cookSeconds: number): boolean {
   return cookSeconds >= COOK.burntFrom;
 }
 
+/** Doneness of a cook item using its appliance's bands (grill / fryer / pan). */
+export function gradeOfItem(item: CookItem): Grade {
+  const b = APPLIANCE_COOK[item.station];
+  if (item.cook < b.perfectFrom) return 'good';
+  if (item.cook < b.overdoneFrom) return 'perfect';
+  return 'overdone';
+}
+
+export function isBurntItem(item: CookItem): boolean {
+  return item.cook >= APPLIANCE_COOK[item.station].burntFrom;
+}
+
 function gradePay(grade: Grade): number {
   return grade === 'perfect' ? PAYOUT.perfect : grade === 'good' ? PAYOUT.good : PAYOUT.overdone;
+}
+
+function friesPay(grade: Grade): number {
+  return grade === 'perfect' ? PAYOUT.friesPerfect : grade === 'good' ? PAYOUT.friesGood : PAYOUT.friesOverdone;
 }
 
 /**
@@ -78,7 +94,9 @@ export function platePayout(plate: Plate, order: Order, combo: number): number {
   let pay = 0;
   if (plate.sausage) pay += PAYOUT.bun + gradePay(plate.sausage);
   if (plate.patty) pay += PAYOUT.burgerBun + gradePay(plate.patty);
+  if (plate.fries) pay += friesPay(plate.fries);
   if (order.ketchup) pay += plate.ketchup ? PAYOUT.ketchup : -PAYOUT.ketchupMiss;
+  if (order.onion) pay += plate.onion ? PAYOUT.onion : -PAYOUT.onionMiss;
   if (plate.drink) pay += PAYOUT.drink;
   pay += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
   return Math.max(0, pay);
@@ -94,31 +112,31 @@ function emptyPlate(over: Partial<Plate> = {}): Plate {
 // ---------------------------------------------------------------------------
 /** Time-aware order generation: only includes items unlocked by `elapsed`. */
 export function generateOrder(rng: () => number = Math.random, elapsed = Infinity): Order {
-  const burgerOk = elapsed >= UNLOCK.burger;
-  const useBurger = burgerOk && rng() < 0.45;
+  const useBurger = elapsed >= UNLOCK.burger && rng() < 0.45;
   return {
     sausage: !useBurger,
     burger: useBurger,
     ketchup: rng() < 0.4,
+    onion: elapsed >= UNLOCK.onion && useBurger && rng() < 0.4, // onions ride on burgers
     mustard: false, // unlocked in a later phase
     drink: rng() < 0.4,
-    fries: false,
-    onion: false,
+    fries: elapsed >= UNLOCK.fries && rng() < 0.45,
   };
 }
 
-/** Order completes when every wanted FOOD is present. Condiments (ketchup/mustard) are pay-only. */
+/** Order completes when every wanted FOOD is present. Condiments (ketchup/mustard/onion) are pay-only. */
 export function plateMatchesOrder(plate: Plate, order: Order): boolean {
   return (
     (plate.sausage !== null) === order.sausage &&
     (plate.patty !== null) === order.burger &&
+    (plate.fries !== null) === order.fries &&
     plate.drink === order.drink
   );
 }
 
 export function plateIsEmpty(plate: Plate | null): boolean {
   // A lone bun isn't servable — only real contents count.
-  return !plate || (plate.sausage === null && plate.patty === null && !plate.drink && !plate.ketchup);
+  return !plate || (plate.sausage === null && plate.patty === null && plate.fries === null && !plate.drink && !plate.ketchup);
 }
 
 function firstEmptySlot(state: GameState): number {
@@ -128,25 +146,45 @@ function firstEmptySlot(state: GameState): number {
 // ---------------------------------------------------------------------------
 // Taps (no drag): cook / toss a burnt dog / drop a fresh bun on the table
 // ---------------------------------------------------------------------------
-export function startCooking(state: GameState, slot: number, kind: 'sausage' | 'patty' = 'sausage'): boolean {
+function itemAt(state: GameState, station: CookStation, slot: number): CookItem | undefined {
+  return state.dogs.find((d) => d.station === station && d.slot === slot);
+}
+
+/** Start cooking on an appliance slot. Returns false if that slot is occupied. */
+function startOn(state: GameState, station: CookStation, slot: number, kind: CookItem['kind']): boolean {
   if (state.phase !== 'playing') return false;
-  if (state.dogs.some((d) => d.slot === slot)) return false;
-  state.dogs.push({ id: state.nextDogId++, kind, station: 'grill', slot, cook: 0 });
+  if (itemAt(state, station, slot)) return false;
+  state.dogs.push({ id: state.nextDogId++, kind, station, slot, cook: 0 });
   return true;
+}
+
+export function startCooking(state: GameState, slot: number, kind: 'sausage' | 'patty' = 'sausage'): boolean {
+  return startOn(state, 'grill', slot, kind);
+}
+export function startFrying(state: GameState, slot: number): boolean {
+  return startOn(state, 'fryer', slot, 'fries');
+}
+export function startPan(state: GameState, slot: number): boolean {
+  return startOn(state, 'pan', slot, 'onion');
 }
 
 export type GrillTap = 'cooking' | 'tossed' | 'grab' | 'none';
 
-/** Tap a grill slot: empty -> start cooking; burnt -> toss; cooked -> nothing (drag it instead). */
-export function tapGrill(state: GameState, slot: number): GrillTap {
+/** Tap an appliance slot: empty grill -> cook sausage; burnt -> toss; cooked -> nothing (drag it). */
+export function tapAppliance(state: GameState, station: CookStation, slot: number): GrillTap {
   if (state.phase !== 'playing') return 'none';
-  const idx = state.dogs.findIndex((d) => d.slot === slot);
-  if (idx === -1) return startCooking(state, slot) ? 'cooking' : 'none';
-  if (isBurnt(state.dogs[idx].cook)) {
-    state.dogs.splice(idx, 1);
+  const item = itemAt(state, station, slot);
+  if (!item) return station === 'grill' && startCooking(state, slot) ? 'cooking' : 'none';
+  if (isBurntItem(item)) {
+    state.dogs = state.dogs.filter((d) => d !== item);
     return 'tossed';
   }
   return 'grab';
+}
+
+/** Back-compat: tapping a grill slot. */
+export function tapGrill(state: GameState, slot: number): GrillTap {
+  return tapAppliance(state, 'grill', slot);
 }
 
 /** Tap the Bun station to place a fresh hot-dog bun on the next empty table plate. Returns slot or -1. */
@@ -172,21 +210,32 @@ export function placeBurgerBun(state: GameState): number {
 // ---------------------------------------------------------------------------
 export type DropResult = 'ok' | 'need-bun' | 'busy' | 'bad';
 
-/** Drag a cooked sausage/patty from the grill onto the matching bun on the table. */
+/** Drag a cooked item from an appliance onto the table (the matching bun, or a fries/onion target). */
 export function dropCookedOnPlate(state: GameState, itemId: number, plateSlot: number): DropResult {
   if (state.phase !== 'playing') return 'bad';
   const item = state.dogs.find((d) => d.id === itemId);
-  if (!item || isBurnt(item.cook)) return 'bad';
+  if (!item || isBurntItem(item)) return 'bad';
   const plate = state.plates[plateSlot];
-  if (!plate) return 'need-bun';
-  if (item.kind === 'sausage') {
-    if (!plate.bun) return 'need-bun';
+  const grade = gradeOfItem(item);
+
+  if (item.kind === 'fries') {
+    // fries need no bun; they can even start a fresh plate on an empty slot
+    if (!plate) state.plates[plateSlot] = emptyPlate({ fries: grade });
+    else if (plate.fries === null) plate.fries = grade;
+    else return 'busy';
+  } else if (item.kind === 'onion') {
+    // onion is a topping: it needs a protein already on the plate
+    if (!plate || (plate.sausage === null && plate.patty === null)) return 'bad';
+    if (plate.onion) return 'busy';
+    plate.onion = true;
+  } else if (item.kind === 'sausage') {
+    if (!plate || !plate.bun) return 'need-bun';
     if (plate.sausage !== null) return 'busy';
-    plate.sausage = gradeOf(item.cook);
+    plate.sausage = grade;
   } else if (item.kind === 'patty') {
-    if (!plate.burgerBun) return 'need-bun';
+    if (!plate || !plate.burgerBun) return 'need-bun';
     if (plate.patty !== null) return 'busy';
-    plate.patty = gradeOf(item.cook);
+    plate.patty = grade;
   } else {
     return 'bad';
   }

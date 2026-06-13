@@ -37,18 +37,33 @@ export function customerBubbleRect(slot: number): Rect {
   return { x: face.x + 8, y: CUSTOMER.bubbleY, w: face.w - 16, h: CUSTOMER.bubbleH };
 }
 
-// ---- stations: condiments + trash down the left, hot-dog buns centre ----
+// ---- appliances: fryer (left) and onion pan (bottom-centre) ----
+export const FRYER = { x: 10, y: 356, w: 128, h: 96, slots: 2 } as const;
+export const PAN = { x: 268, y: 452, w: 130, h: 92, slots: 2 } as const;
+
+export function fryerSlotRect(slot: number): Rect {
+  return { x: FRYER.x + 6 + slot * 60, y: FRYER.y + 6, w: 54, h: FRYER.h - 12 };
+}
+export function panSlotRect(slot: number): Rect {
+  return { x: PAN.x + 6 + slot * 60, y: PAN.y + 6, w: 54, h: PAN.h - 12 };
+}
+
+// ---- stations: condiments + trash + raw sources ----
 export const STATION_RECTS: Record<Station, Rect> = {
-  ketchup: { x: 10, y: 152, w: 130, h: 80 },
-  trash: { x: 10, y: 244, w: 130, h: 84 },
-  drink: { x: 10, y: 340, w: 130, h: 84 },
-  bun: { x: 284, y: 158, w: 130, h: 72 }, // hot-dog bun source (centre)
-  burgerBun: { x: 430, y: 158, w: 130, h: 72 }, // burger bun source (centre)
-  rawPatty: { x: 528, y: 452, w: 130, h: 84 }, // raw patties — drag onto the grill to cook
+  ketchup: { x: 10, y: 150, w: 128, h: 64 },
+  trash: { x: 10, y: 222, w: 128, h: 64 },
+  drink: { x: 10, y: 286, w: 128, h: 62 }, // left column, above the fryer
+  bun: { x: 284, y: 150, w: 118, h: 66 }, // hot-dog bun source (centre)
+  burgerBun: { x: 408, y: 150, w: 118, h: 66 }, // burger bun source (centre)
+  rawPotato: { x: 148, y: 452, w: 108, h: 92 }, // drag onto the fryer
+  rawOnion: { x: 410, y: 452, w: 108, h: 92 }, // drag onto the pan
+  rawPatty: { x: 530, y: 452, w: 108, h: 92 }, // drag onto the grill
 };
 
 export type Target =
   | { kind: 'grill'; slot: number }
+  | { kind: 'fryer'; slot: number }
+  | { kind: 'pan'; slot: number }
   | { kind: 'table'; slot: number }
   | { kind: 'customer'; slot: number }
   | { kind: 'station'; station: Station };
@@ -57,6 +72,12 @@ export type Target =
 export function targetAt(px: number, py: number): Target | null {
   for (let s = 0; s < GRILL.slots; s++) {
     if (pointInRect(px, py, grillSlotRect(s))) return { kind: 'grill', slot: s };
+  }
+  for (let s = 0; s < FRYER.slots; s++) {
+    if (pointInRect(px, py, fryerSlotRect(s))) return { kind: 'fryer', slot: s };
+  }
+  for (let s = 0; s < PAN.slots; s++) {
+    if (pointInRect(px, py, panSlotRect(s))) return { kind: 'pan', slot: s };
   }
   for (let s = 0; s < TABLE.slots; s++) {
     if (pointInRect(px, py, tableSlotRect(s))) return { kind: 'table', slot: s };

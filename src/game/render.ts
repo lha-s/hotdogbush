@@ -1,8 +1,8 @@
 import { sprite, type SpriteKey } from './assets.ts';
-import { BOARD, CASH, COOK, GRILL, PALETTE, TABLE } from './constants.ts';
-import { STATION_RECTS, customerBubbleRect, customerSlotRect, grillSlotRect, tableSlotRect, targetAt } from './geometry.ts';
+import { APPLIANCE_COOK, BOARD, CASH, GRILL, PALETTE, TABLE } from './constants.ts';
+import { FRYER, PAN, STATION_RECTS, customerBubbleRect, customerSlotRect, fryerSlotRect, grillSlotRect, panSlotRect, tableSlotRect, targetAt } from './geometry.ts';
 import type { Rect } from './geometry.ts';
-import { gradeOf, isBurnt } from './logic.ts';
+import { gradeOfItem, isBurntItem } from './logic.ts';
 import type { CookItem, GameState, Order, Plate, ServeFx } from './types.ts';
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -116,8 +116,16 @@ function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
   drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
   drawStationBox(ctx, STATION_RECTS.rawPatty, 'Patties', true);
   drawPattyIcon(ctx, STATION_RECTS.rawPatty);
+  drawStationBox(ctx, STATION_RECTS.rawPotato, 'Potatoes', true);
+  drawSourceSprite(ctx, STATION_RECTS.rawPotato, 'friesRaw');
+  drawStationBox(ctx, STATION_RECTS.rawOnion, 'Onions', true);
+  drawSourceSprite(ctx, STATION_RECTS.rawOnion, 'onionRaw');
   drawStationBox(ctx, STATION_RECTS.trash, 'Trash', false);
   drawTrashIcon(ctx, STATION_RECTS.trash);
+}
+
+function drawSourceSprite(ctx: CanvasRenderingContext2D, r: Rect, key: SpriteKey): void {
+  drawSprite(ctx, key, r.x + r.w / 2 - 24, r.y + 8, 48, 40);
 }
 
 function drawBurgerBunIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
@@ -142,20 +150,19 @@ function drawPattyIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
   }
 }
 
-// ---- grill ----
+// ---- appliances ----
 function itemSpriteKey(item: CookItem): SpriteKey {
-  if (item.kind === 'patty') {
-    if (isBurnt(item.cook)) return 'pattyBurnt';
-    return item.cook < COOK.perfectFrom ? 'pattyRaw' : 'pattyCooked';
-  }
-  if (isBurnt(item.cook)) return 'sausageBurnt';
-  return item.cook < COOK.perfectFrom ? 'sausageRaw' : 'sausageCooked';
+  const raw = item.cook < APPLIANCE_COOK[item.station].perfectFrom;
+  if (item.kind === 'patty') return isBurntItem(item) ? 'pattyBurnt' : raw ? 'pattyRaw' : 'pattyCooked';
+  if (item.kind === 'fries') return raw ? 'friesRaw' : 'friesCooked';
+  if (item.kind === 'onion') return raw ? 'onionRaw' : 'onionCooked';
+  return isBurntItem(item) ? 'sausageBurnt' : raw ? 'sausageRaw' : 'sausageCooked';
 }
 
 function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (let s = 0; s < GRILL.slots; s++) {
     const r = grillSlotRect(s);
-    const dog = state.dogs.find((d) => d.slot === s);
+    const dog = state.dogs.find((d) => d.station === 'grill' && d.slot === s);
     ctx.fillStyle = dog ? PALETTE.grillHot : PALETTE.grillCold;
     roundRect(ctx, r.x, r.y, r.w, r.h, 10);
     ctx.fill();
@@ -187,34 +194,66 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
 }
 
 function drawDog(ctx: CanvasRenderingContext2D, item: CookItem, r: Rect): void {
+  const bands = APPLIANCE_COOK[item.station];
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2 - 6;
-  const sw = 104;
-  drawSprite(ctx, itemSpriteKey(item), cx - sw / 2, cy - (sw * 44) / 120 / 2, sw, (sw * 44) / 120);
+  const wide = item.kind === 'sausage' || item.kind === 'patty';
+  const spriteW = Math.min(r.w - 8, 104);
+  const spriteH = wide ? (spriteW * 44) / 120 : spriteW * 0.72;
+  drawSprite(ctx, itemSpriteKey(item), cx - spriteW / 2, cy - spriteH / 2, spriteW, spriteH);
 
-  if (isBurnt(item.cook)) {
+  if (isBurntItem(item)) {
     ctx.fillStyle = PALETTE.ember;
     ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🔥 burnt — trash it', cx, r.y + r.h - 12);
+    ctx.fillText(r.w < 140 ? '🔥' : '🔥 burnt — trash it', cx, r.y + r.h - 12);
     return;
   }
 
-  const meterW = r.w - 20;
-  const mx = r.x + 10;
-  const my = r.y + r.h - 13;
+  const meterW = r.w - 16;
+  const mx = r.x + 8;
+  const my = r.y + r.h - 12;
   ctx.fillStyle = PALETTE.meterBg;
   roundRect(ctx, mx, my, meterW, 6, 3);
   ctx.fill();
-  const zStart = mx + meterW * (COOK.perfectFrom / COOK.meterMax);
-  const zEnd = mx + meterW * (COOK.overdoneFrom / COOK.meterMax);
+  const zStart = mx + meterW * (bands.perfectFrom / bands.meterMax);
+  const zEnd = mx + meterW * (bands.overdoneFrom / bands.meterMax);
   ctx.fillStyle = 'rgba(95,168,58,0.4)';
   ctx.fillRect(zStart, my, zEnd - zStart, 6);
-  const grade = gradeOf(item.cook);
+  const grade = gradeOfItem(item);
   ctx.fillStyle = grade === 'perfect' ? PALETTE.meterPerfect : grade === 'good' ? PALETTE.meterRaw : PALETTE.meterBurnt;
-  roundRect(ctx, mx, my, meterW * Math.min(1, item.cook / COOK.meterMax), 6, 3);
+  roundRect(ctx, mx, my, meterW * Math.min(1, item.cook / bands.meterMax), 6, 3);
   ctx.fill();
+}
+
+/** Generic appliance drawer for the fryer and onion pan. */
+function drawAppliance(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  station: 'fryer' | 'pan',
+  slotRect: (s: number) => Rect,
+  slots: number,
+  label: string,
+): void {
+  for (let s = 0; s < slots; s++) {
+    const r = slotRect(s);
+    const item = state.dogs.find((d) => d.station === station && d.slot === s);
+    ctx.fillStyle = item ? PALETTE.grillHot : PALETTE.grillCold;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.stroke();
+    if (item) drawDog(ctx, item, r);
+  }
+  const first = slotRect(0);
+  ctx.fillStyle = PALETTE.muted;
+  ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(label, first.x, first.y - 4);
 }
 
 // ---- prep table ----
@@ -247,12 +286,15 @@ function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect)
   }
   if (plate.sausage) {
     drawSprite(ctx, 'sausageCooked', cx - 46, cy - 2, 92, 34);
+    if (plate.onion) drawSprite(ctx, 'onionCooked', cx - 30, cy - 8, 60, 18);
     if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy);
   }
   if (plate.patty) {
     drawSprite(ctx, 'pattyCooked', cx - 44, cy - 2, 88, 30);
+    if (plate.onion) drawSprite(ctx, 'onionCooked', cx - 30, cy - 10, 60, 18);
     if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy - 4);
   }
+  if (plate.fries) drawSprite(ctx, 'friesCooked', r.x + 6, r.y + 6, 40, 40);
   if (plate.drink) drawDrinkIcon(ctx, r.x + r.w - 24, r.y + 14);
 }
 
@@ -415,7 +457,7 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: ServeFx[]): void {
 
 // ---- drag ghost + drop-target highlight ----
 export interface DragView {
-  kind: 'sausage' | 'patty' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty';
+  kind: 'sausage' | 'patty' | 'fries' | 'onion' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty' | 'rawPotato' | 'rawOnion';
   x: number;
   y: number;
   slot?: number;
@@ -459,6 +501,10 @@ function drawDragGhost(ctx: CanvasRenderingContext2D, state: GameState, drag: Dr
       ctx.ellipse(x, y, 40, 13, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+  } else if (drag.kind === 'fries' || drag.kind === 'rawPotato') {
+    drawSprite(ctx, drag.kind === 'rawPotato' ? 'friesRaw' : 'friesCooked', x - 24, y - 24, 48, 48);
+  } else if (drag.kind === 'onion' || drag.kind === 'rawOnion') {
+    drawSprite(ctx, drag.kind === 'rawOnion' ? 'onionRaw' : 'onionCooked', x - 30, y - 20, 60, 40);
   } else if (drag.kind === 'ketchup') {
     drawKetchupIcon(ctx, x, y - 14);
   } else if (drag.kind === 'drink') {
@@ -484,6 +530,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
   drawBackground(ctx);
   drawStations(ctx, state);
   drawGrill(ctx, state);
+  drawAppliance(ctx, state, 'fryer', fryerSlotRect, FRYER.slots, 'FRYER');
+  drawAppliance(ctx, state, 'pan', panSlotRect, PAN.slots, 'ONIONS');
   const hoverSlot = drag ? (() => { const t = targetAt(drag.x, drag.y); return t?.kind === 'table' ? t.slot : -1; })() : -1;
   drawTable(ctx, state, hoverSlot);
   drawCustomers(ctx, state);

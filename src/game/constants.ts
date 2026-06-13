@@ -54,6 +54,13 @@ export const COOK = {
   meterMax: 24, // s — visual ceiling for the cook meter
 } as const;
 
+// Fries fry faster; onions caramelise on a middle band. Same shape as COOK (grill).
+export const FRYER_COOK = { perfectFrom: 5, overdoneFrom: 8, burntFrom: 12, meterMax: 14 } as const;
+export const PAN_COOK = { perfectFrom: 6, overdoneFrom: 10, burntFrom: 15, meterMax: 17 } as const;
+
+// Doneness bands per appliance, looked up by CookItem.station.
+export const APPLIANCE_COOK = { grill: COOK, fryer: FRYER_COOK, pan: PAN_COOK } as const;
+
 // Economy mirrors the original: a hot dog = bun ($10) + sausage value ($6/$10/$5);
 // ketchup adds $3 when wanted (and docks $2 if wanted but missing); a drink adds $7.
 export const PAYOUT = {
@@ -65,6 +72,11 @@ export const PAYOUT = {
   ketchup: 3,
   ketchupMiss: 2, // penalty when the order wanted ketchup and didn't get it
   drink: 7,
+  friesPerfect: 8, // fries value by doneness
+  friesGood: 5,
+  friesOverdone: 3,
+  onion: 4, // caramelised-onion topping when wanted
+  onionMiss: 2, // penalty when the order wanted onion and didn't get it
   comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
   comboMax: 5,
 } as const;

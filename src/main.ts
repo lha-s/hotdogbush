@@ -92,10 +92,10 @@ function showStart(): void {
   hud.hidden = true;
   overlay.innerHTML = `
     <h2>HotDogBush 🌭</h2>
-    <p>You've got <strong>90 seconds</strong>. Read each order, then build it on the <strong>prep table</strong>
-    (up to 3 at once — tap a plate to top it): grab a <strong>Bun</strong> → cook a sausage and tap it onto the bun
-    (green zone = top dollar) → add <strong>Ketchup</strong> / <strong>Drink</strong> to match → tap the customer to serve.
-    Then <strong>tap the cash</strong> before it vanishes! Burnt dogs go in the <strong>Trash</strong>.</p>
+    <p>You've got <strong>90 seconds</strong>. Tap <strong>Bun</strong> to set a bun on the prep table and tap the
+    grill to cook (green zone = top dollar). Then <strong>drag</strong>: cooked sausage → bun,
+    <strong>Ketchup</strong>/<strong>Drink</strong> → plate, and finally drag the finished plate onto the
+    customer whose order it matches. <strong>Tap the cash</strong> before it vanishes; drag burnt dogs to the <strong>Trash</strong>.</p>
     <button class="btn btn--play" id="playBtn">Start the shift</button>
     <p style="font-size:0.8rem;color:var(--color-muted)">Cash collected this shift is your score on the $${ticker} leaderboard.</p>
   `;

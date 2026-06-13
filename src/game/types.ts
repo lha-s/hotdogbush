@@ -56,7 +56,6 @@ export interface GameState {
   dogs: Dog[];
   customers: Customer[];
   plates: (Plate | null)[]; // prep table: one entry per TABLE.slots
-  activePlate: number; // index of the plate being topped, or -1
   cashTokens: CashToken[];
   nextDogId: number;
   nextCustomerId: number;

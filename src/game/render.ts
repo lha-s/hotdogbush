@@ -1,6 +1,6 @@
 import { sprite, type SpriteKey } from './assets.ts';
 import { BOARD, CASH, COOK, GRILL, PALETTE, TABLE } from './constants.ts';
-import { STATION_RECTS, customerSlotRect, grillSlotRect, tableSlotRect } from './geometry.ts';
+import { STATION_RECTS, customerSlotRect, grillSlotRect, tableSlotRect, targetAt } from './geometry.ts';
 import type { Rect } from './geometry.ts';
 import { gradeOf, isBurnt } from './logic.ts';
 import type { Dog, GameState, Order, Plate, ServeFx } from './types.ts';
@@ -101,12 +101,14 @@ function drawTrashIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
 }
 
 function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
-  const p = state.activePlate >= 0 ? state.plates[state.activePlate] : null;
-  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', state.plates.includes(null));
+  const plates = state.plates;
+  const canKetchup = plates.some((p) => p && p.sausage !== null && !p.ketchup);
+  const canDrink = plates.includes(null) || plates.some((p) => p && !p.drink);
+  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', plates.includes(null));
   drawBunIcon(ctx, STATION_RECTS.bun);
-  drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', !!p && p.sausage !== null && !p.ketchup);
+  drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', canKetchup);
   drawKetchupIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 16);
-  drawStationBox(ctx, STATION_RECTS.drink, 'Drink', (!!p && !p.drink) || state.plates.includes(null));
+  drawStationBox(ctx, STATION_RECTS.drink, 'Drink', canDrink);
   drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
   drawStationBox(ctx, STATION_RECTS.trash, 'Trash', false);
   drawTrashIcon(ctx, STATION_RECTS.trash);
@@ -210,22 +212,22 @@ function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect)
   if (plate.drink) drawDrinkIcon(ctx, r.x + r.w - 24, r.y + 14);
 }
 
-function drawTable(ctx: CanvasRenderingContext2D, state: GameState): void {
+function drawTable(ctx: CanvasRenderingContext2D, state: GameState, hoverSlot: number): void {
   for (let s = 0; s < TABLE.slots; s++) {
     const r = tableSlotRect(s);
     const plate = state.plates[s];
-    const isActive = state.activePlate === s && plate !== null;
+    const hovered = hoverSlot === s;
 
     // dish
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
     roundRect(ctx, r.x, r.y, r.w, r.h, 14);
     ctx.fill();
-    ctx.fillStyle = isActive ? PALETTE.plateActive : PALETTE.plate;
+    ctx.fillStyle = hovered ? PALETTE.plateActive : PALETTE.plate;
     ctx.beginPath();
     ctx.ellipse(r.x + r.w / 2, r.y + r.h - 26, r.w / 2 - 10, 20, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (isActive) {
+    if (hovered) {
       ctx.strokeStyle = PALETTE.mustard;
       ctx.lineWidth = 3;
       roundRect(ctx, r.x, r.y, r.w, r.h, 14);
@@ -246,7 +248,7 @@ function drawTable(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('PREP TABLE — tap a plate to top it', BOARD.width / 2, TABLE.y - 6);
+  ctx.fillText('PREP TABLE — drop sausage / ketchup / drink here', BOARD.width / 2, TABLE.y - 6);
 }
 
 // ---- customers ----
@@ -356,13 +358,71 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: ServeFx[]): void {
   ctx.globalAlpha = 1;
 }
 
+// ---- drag ghost + drop-target highlight ----
+export interface DragView {
+  kind: 'sausage' | 'plate' | 'ketchup' | 'drink';
+  x: number;
+  y: number;
+  slot?: number;
+}
+
+function highlightTarget(ctx: CanvasRenderingContext2D, drag: DragView): number {
+  const t = targetAt(drag.x, drag.y);
+  if (!t) return -1;
+  if (t.kind === 'table') return t.slot; // handled as hover in drawTable
+  if (t.kind === 'customer' && drag.kind === 'plate') {
+    const r = customerSlotRect(t.slot);
+    ctx.strokeStyle = PALETTE.cash;
+    ctx.lineWidth = 4;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 12);
+    ctx.stroke();
+  } else if (t.kind === 'station' && t.station === 'trash') {
+    const r = STATION_RECTS.trash;
+    ctx.strokeStyle = PALETTE.meterBurnt;
+    ctx.lineWidth = 4;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 12);
+    ctx.stroke();
+  }
+  return -1;
+}
+
+function drawDragGhost(ctx: CanvasRenderingContext2D, state: GameState, drag: DragView): void {
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  const { x, y } = drag;
+  if (drag.kind === 'sausage') {
+    if (!drawSprite(ctx, 'sausageCooked', x - 48, y - 18, 96, 36)) {
+      ctx.fillStyle = PALETTE.perfect;
+      roundRect(ctx, x - 44, y - 11, 88, 22, 11);
+      ctx.fill();
+    }
+  } else if (drag.kind === 'ketchup') {
+    drawKetchupIcon(ctx, x, y - 14);
+  } else if (drag.kind === 'drink') {
+    drawDrinkIcon(ctx, x, y - 16);
+  } else if (drag.kind === 'plate' && drag.slot != null) {
+    const plate = state.plates[drag.slot];
+    if (plate) {
+      if (plate.bun && !drawSprite(ctx, 'bun', x - 52, y - 16, 100, 42)) {
+        ctx.fillStyle = PALETTE.bun;
+        roundRect(ctx, x - 46, y - 6, 92, 22, 11);
+        ctx.fill();
+      }
+      if (plate.sausage) drawSprite(ctx, 'sausageCooked', x - 44, y - 14, 88, 32);
+      if (plate.drink) drawDrinkIcon(ctx, x + 40, y - 16);
+    }
+  }
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------------------
-export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: ServeFx[]): void {
+export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: ServeFx[], drag?: DragView | null): void {
   ctx.clearRect(0, 0, BOARD.width, BOARD.height);
   drawBackground(ctx);
   drawStations(ctx, state);
   drawGrill(ctx, state);
-  drawTable(ctx, state);
+  const hoverSlot = drag ? (() => { const t = targetAt(drag.x, drag.y); return t?.kind === 'table' ? t.slot : -1; })() : -1;
+  drawTable(ctx, state, hoverSlot);
   drawCustomers(ctx, state);
   drawCashTokens(ctx, state);
   drawFx(ctx, fx);
@@ -373,5 +433,10 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
     ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width - 160, GRILL.y - 24);
+  }
+
+  if (drag) {
+    highlightTarget(ctx, drag);
+    drawDragGhost(ctx, state, drag);
   }
 }

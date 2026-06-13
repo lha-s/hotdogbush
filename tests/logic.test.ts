@@ -3,19 +3,23 @@ import { CASH, COOK, ORDER_COMBOS, PAYOUT, RULES, SHIFT } from '../src/game/cons
 import {
   collectToken,
   createState,
+  dropDrink,
+  dropKetchup,
+  dropSausageOnPlate,
   generateOrder,
   gradeOf,
   isBurnt,
+  placeBun,
   plateMatchesOrder,
   platePayout,
-  selectPlate,
-  serveCustomer,
+  servePlate,
   startCooking,
   startGame,
   step,
   tapGrill,
   tokenAt,
-  useStation,
+  trashPlate,
+  trashSausage,
 } from '../src/game/logic.ts';
 import type { GameState, Order, Plate } from '../src/game/types.ts';
 
@@ -28,6 +32,13 @@ function addCustomer(s: GameState, order: Order, slot = 0): void {
   s.customers.push({ id: 99, slot, order, patience: 10, patienceMax: 10, served: false, leaving: false, appear: 1 });
 }
 const plate = (p: Partial<Plate>): Plate => ({ bun: false, sausage: null, ketchup: false, drink: false, ...p });
+
+/** Cook a sausage in slot 0 to `cook` seconds and return its id. */
+function cookOne(s: GameState, cook: number): number {
+  startCooking(s, 0);
+  s.dogs[0].cook = cook;
+  return s.dogs[0].id;
+}
 
 describe('cooking grades & burn', () => {
   test('doneness bands follow the original 7s / 14s steps', () => {
@@ -56,16 +67,15 @@ describe('economy (bun $10 + sausage + ketchup $3 + drink $7)', () => {
     expect(platePayout(plate({ bun: true, sausage: 'perfect' }), o, 0)).toBe(PAYOUT.bun + PAYOUT.perfect - PAYOUT.ketchupMiss);
   });
   test('drink-only pays the drink value', () => {
-    const o: Order = { sausage: false, ketchup: false, drink: true };
-    expect(platePayout(plate({ drink: true }), o, 0)).toBe(PAYOUT.drink);
+    expect(platePayout(plate({ drink: true }), { sausage: false, ketchup: false, drink: true }, 0)).toBe(PAYOUT.drink);
   });
 });
 
 describe('order matching (ketchup is a modifier, not a gate)', () => {
   test('completes on sausage + drink presence, ignoring ketchup', () => {
     const o: Order = { sausage: true, ketchup: true, drink: false };
-    expect(plateMatchesOrder(plate({ bun: true, sausage: 'good' }), o)).toBe(true); // missing ketchup still matches
-    expect(plateMatchesOrder(plate({ bun: true, sausage: 'good', drink: true }), o)).toBe(false); // unwanted drink
+    expect(plateMatchesOrder(plate({ bun: true, sausage: 'good' }), o)).toBe(true);
+    expect(plateMatchesOrder(plate({ bun: true, sausage: 'good', drink: true }), o)).toBe(false);
   });
   test('generateOrder yields canonical combos', () => {
     for (let i = 0; i < ORDER_COMBOS.length; i++) {
@@ -74,95 +84,104 @@ describe('order matching (ketchup is a modifier, not a gate)', () => {
   });
 });
 
-describe('multi-plate prep table', () => {
-  test('Bun fills the next empty slot and makes it active', () => {
+describe('taps: cook, toss, place bun', () => {
+  test('tapping an empty grill slot starts cooking; a cooked one says grab (drag it)', () => {
     const s = playing();
-    expect(useStation(s, 'bun')).toBe('ok');
-    expect(s.activePlate).toBe(0);
-    expect(useStation(s, 'bun')).toBe('ok');
-    expect(s.activePlate).toBe(1);
-    expect(s.plates.filter(Boolean)).toHaveLength(2);
-  });
-  test('tapping a table plate selects it as active', () => {
-    const s = playing();
-    useStation(s, 'bun'); // slot 0
-    useStation(s, 'bun'); // slot 1 active
-    expect(selectPlate(s, 0)).toBe('selected');
-    expect(s.activePlate).toBe(0);
-  });
-  test('cooked sausage goes onto the ACTIVE bun', () => {
-    const s = playing();
-    useStation(s, 'bun');
-    startCooking(s, 0);
+    expect(tapGrill(s, 0)).toBe('cooking');
     s.dogs[0].cook = 10;
-    expect(tapGrill(s, 0)).toBe('plated');
-    expect(s.plates[0]?.sausage).toBe('perfect');
+    expect(tapGrill(s, 0)).toBe('grab');
   });
-  test('cannot plate a sausage with no active bun', () => {
+  test('tapping a burnt grill slot tosses it', () => {
     const s = playing();
-    startCooking(s, 0);
-    s.dogs[0].cook = 10;
-    expect(tapGrill(s, 0)).toBe('need-bun');
+    cookOne(s, COOK.burntFrom + 1);
+    expect(tapGrill(s, 0)).toBe('tossed');
+    expect(s.dogs).toHaveLength(0);
   });
-  test('table caps at its slot count', () => {
+  test('Bun fills the next empty table slot, then refuses when full', () => {
     const s = playing();
-    useStation(s, 'bun');
-    useStation(s, 'bun');
-    useStation(s, 'bun');
-    expect(useStation(s, 'bun')).toBe('noop'); // full
+    expect(placeBun(s)).toBe(0);
+    expect(placeBun(s)).toBe(1);
+    expect(placeBun(s)).toBe(2);
+    expect(placeBun(s)).toBe(-1);
+  });
+});
+
+describe('drag & drop assembly', () => {
+  test('drag a cooked sausage onto a bun', () => {
+    const s = playing();
+    const slot = placeBun(s);
+    const id = cookOne(s, 10);
+    expect(dropSausageOnPlate(s, id, slot)).toBe('ok');
+    expect(s.plates[slot]?.sausage).toBe('perfect');
+    expect(s.dogs).toHaveLength(0);
+  });
+  test('sausage needs a bun, and a bun holds only one', () => {
+    const s = playing();
+    const id = cookOne(s, 10);
+    expect(dropSausageOnPlate(s, id, 0)).toBe('need-bun'); // empty slot
+    const slot = placeBun(s);
+    expect(dropSausageOnPlate(s, id, slot)).toBe('ok');
+    const id2 = cookOne(s, 10);
+    expect(dropSausageOnPlate(s, id2, slot)).toBe('busy');
+  });
+  test('a burnt sausage cannot be plated', () => {
+    const s = playing();
+    const slot = placeBun(s);
+    const id = cookOne(s, COOK.burntFrom + 1);
+    expect(dropSausageOnPlate(s, id, slot)).toBe('bad');
+  });
+  test('drag ketchup onto a dog; drag a drink onto a plate or empty slot', () => {
+    const s = playing();
+    const slot = placeBun(s);
+    const id = cookOne(s, 10);
+    dropSausageOnPlate(s, id, slot);
+    expect(dropKetchup(s, slot)).toBe(true);
+    expect(s.plates[slot]?.ketchup).toBe(true);
+    expect(dropDrink(s, slot)).toBe(true);
+    expect(dropDrink(s, 2)).toBe(true); // empty slot -> drink-only plate
+    expect(s.plates[2]).toEqual({ bun: false, sausage: null, ketchup: false, drink: true });
   });
 });
 
 describe('trash', () => {
-  test('burnt grill dog can be tossed by tapping it', () => {
-    const s = playing();
-    startCooking(s, 1);
-    s.dogs[0].cook = COOK.burntFrom + 1;
-    expect(tapGrill(s, 1)).toBe('tossed');
-    expect(s.dogs).toHaveLength(0);
-  });
-  test('trash station bins the active plate and breaks combo', () => {
+  test('trash a sausage and trash a plate', () => {
     const s = playing();
     s.combo = 4;
-    useStation(s, 'bun');
-    expect(useStation(s, 'trash')).toBe('ok');
-    expect(s.plates[0]).toBeNull();
-    expect(s.activePlate).toBe(-1);
-    expect(s.combo).toBe(0);
-  });
-  test('trash station scrapes a burnt dog when no active plate', () => {
-    const s = playing();
-    startCooking(s, 2);
-    s.dogs[0].cook = COOK.burntFrom + 2;
-    expect(useStation(s, 'trash')).toBe('ok');
+    const id = cookOne(s, 10);
+    expect(trashSausage(s, id)).toBe(true);
     expect(s.dogs).toHaveLength(0);
+    const slot = placeBun(s);
+    expect(trashPlate(s, slot)).toBe(true);
+    expect(s.plates[slot]).toBeNull();
+    expect(s.combo).toBe(0);
   });
 });
 
 describe('serving + cash collection', () => {
-  test('a matching order serves, spawns a token, defers the cash', () => {
+  function buildDog(s: GameState, slot: number, cook = 10): void {
+    const id = cookOne(s, cook);
+    dropSausageOnPlate(s, id, slot);
+  }
+
+  test('drag a matching plate to a customer: serves, spawns a token, defers cash', () => {
     const s = playing();
     addCustomer(s, { sausage: true, ketchup: false, drink: false });
-    useStation(s, 'bun');
-    startCooking(s, 0);
-    s.dogs[0].cook = 10;
-    tapGrill(s, 0);
-    const res = serveCustomer(s, 0);
+    const slot = placeBun(s);
+    buildDog(s, slot);
+    const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(true);
     expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect);
     expect(s.cashTokens).toHaveLength(1);
     expect(s.cash).toBe(0);
     expect(s.pending).toBe(res.payout);
-    expect(s.plates[0]).toBeNull();
+    expect(s.plates[slot]).toBeNull();
   });
   test('missing wanted ketchup still serves, for less', () => {
     const s = playing();
     addCustomer(s, { sausage: true, ketchup: true, drink: false });
-    useStation(s, 'bun');
-    startCooking(s, 0);
-    s.dogs[0].cook = 10;
-    tapGrill(s, 0); // no ketchup added
-    const res = serveCustomer(s, 0);
+    const slot = placeBun(s);
+    buildDog(s, slot);
+    const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(true);
     expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect - PAYOUT.ketchupMiss);
   });
@@ -170,22 +189,27 @@ describe('serving + cash collection', () => {
     const s = playing();
     s.combo = 3;
     addCustomer(s, { sausage: true, ketchup: false, drink: false });
-    useStation(s, 'bun');
-    useStation(s, 'drink'); // adds an unwanted drink to the same plate
-    startCooking(s, 0);
-    s.dogs[0].cook = 10;
-    tapGrill(s, 0);
-    const res = serveCustomer(s, 0);
+    const slot = placeBun(s);
+    buildDog(s, slot);
+    dropDrink(s, slot); // unwanted drink
+    const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('wrong-order');
     expect(s.combo).toBe(0);
     expect(s.wrong).toBe(1);
   });
+  test('serving an empty plate / missing customer is a no-op result', () => {
+    const s = playing();
+    addCustomer(s, { sausage: true, ketchup: false, drink: false });
+    placeBun(s);
+    expect(servePlate(s, 0, 0).reason).toBe('empty-plate'); // bun only counts as empty
+    expect(servePlate(s, 1, 3).reason).toBe('no-customer');
+  });
   test('collecting the token moves pending into cash', () => {
     const s = playing();
     addCustomer(s, { sausage: false, ketchup: false, drink: true });
-    useStation(s, 'drink');
-    serveCustomer(s, 0);
+    dropDrink(s, 0);
+    servePlate(s, 0, 0);
     const tok = s.cashTokens[0];
     expect(tokenAt(s, tok.x, tok.y)?.id).toBe(tok.id);
     expect(collectToken(s, tok.id)).toBe(PAYOUT.drink);
@@ -215,8 +239,8 @@ describe('step / shift', () => {
   test('the clock ends the game and sweeps pending cash into the score', () => {
     const s = playing();
     addCustomer(s, { sausage: false, ketchup: false, drink: true });
-    useStation(s, 'drink');
-    serveCustomer(s, 0);
+    dropDrink(s, 0);
+    servePlate(s, 0, 0);
     s.timeLeft = 0.5;
     step(s, 1, () => 0);
     expect(s.timeLeft).toBe(0);
@@ -226,8 +250,8 @@ describe('step / shift', () => {
   test('uncollected cash expires before the buzzer', () => {
     const s = playing();
     addCustomer(s, { sausage: false, ketchup: false, drink: true });
-    useStation(s, 'drink');
-    serveCustomer(s, 0);
+    dropDrink(s, 0);
+    servePlate(s, 0, 0);
     step(s, CASH.life + 0.1, () => 0);
     expect(s.cashTokens).toHaveLength(0);
     expect(s.pending).toBe(0);
@@ -238,8 +262,7 @@ describe('step / shift', () => {
     s.spawnTimer = RULES.spawnInterval;
     step(s, RULES.spawnInterval + 0.1, () => 0);
     expect(s.customers.length).toBeGreaterThanOrEqual(1);
-    expect(s.customers[0].appear).toBe(0); // spawned this tick
-    step(s, 0.1, () => 0); // animates in on the next tick
+    step(s, 0.1, () => 0);
     expect(s.customers[0].appear).toBeGreaterThan(0);
   });
   test('shift is 90 seconds', () => {

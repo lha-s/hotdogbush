@@ -48,7 +48,7 @@ body {
 }
 
 #app {
-  max-width: 1040px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 1rem 1rem 3rem;
 }
@@ -129,7 +129,7 @@ body {
 .canvas-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 800 / 500;
+  aspect-ratio: 960 / 560;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: #0d0907;
@@ -276,9 +276,6 @@ body {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-@media (min-width: 880px) {
-  main { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-section) 1.5rem; align-items: start; }
-  .stage { grid-column: 1; }
-  .board { grid-column: 2; grid-row: 1; margin-top: 0; }
-  .explain { grid-column: 1 / -1; }
-}
+/* Single column: the game spans the full width, the leaderboard sits directly under it. */
+main { display: block; }
+.board { margin-top: var(--space-section); }

@@ -1,9 +1,9 @@
 import { sprite, type SpriteKey } from './assets.ts';
-import { BOARD, CASH, COOK, GRILL, PALETTE } from './constants.ts';
-import { PLATE_RECT, STATION_RECTS, customerSlotRect, grillSlotRect } from './geometry.ts';
+import { BOARD, CASH, COOK, GRILL, PALETTE, TABLE } from './constants.ts';
+import { STATION_RECTS, customerSlotRect, grillSlotRect, tableSlotRect } from './geometry.ts';
 import type { Rect } from './geometry.ts';
 import { gradeOf, isBurnt } from './logic.ts';
-import type { Dog, GameState, Order, Plate, ServeFx, Station } from './types.ts';
+import type { Dog, GameState, Order, Plate, ServeFx } from './types.ts';
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
@@ -18,21 +18,16 @@ function drawSprite(ctx: CanvasRenderingContext2D, key: SpriteKey, x: number, y:
 }
 
 // ---------------------------------------------------------------------------
-// Background
-// ---------------------------------------------------------------------------
 function drawBackground(ctx: CanvasRenderingContext2D): void {
   if (!drawSprite(ctx, 'bg', 0, 0, BOARD.width, BOARD.height)) {
     ctx.fillStyle = '#181009';
     ctx.fillRect(0, 0, BOARD.width, BOARD.height);
   }
-  // counter band behind the working area
   ctx.fillStyle = 'rgba(20,14,9,0.78)';
-  ctx.fillRect(0, GRILL.y - 24, BOARD.width, BOARD.height - GRILL.y + 24);
+  ctx.fillRect(0, GRILL.y - 30, BOARD.width, BOARD.height - GRILL.y + 30);
 }
 
-// ---------------------------------------------------------------------------
-// Stations
-// ---------------------------------------------------------------------------
+// ---- stations ----
 function drawStationBox(ctx: CanvasRenderingContext2D, r: Rect, label: string, active: boolean): void {
   ctx.fillStyle = active ? PALETTE.stationActive : PALETTE.station;
   roundRect(ctx, r.x, r.y, r.w, r.h, 12);
@@ -42,7 +37,7 @@ function drawStationBox(ctx: CanvasRenderingContext2D, r: Rect, label: string, a
   roundRect(ctx, r.x, r.y, r.w, r.h, 12);
   ctx.stroke();
   ctx.fillStyle = PALETTE.text;
-  ctx.font = '700 13px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = '700 14px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h - 8);
@@ -50,86 +45,74 @@ function drawStationBox(ctx: CanvasRenderingContext2D, r: Rect, label: string, a
 
 function drawBunIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
   const cx = r.x + r.w / 2;
-  const cy = r.y + 30;
-  if (!drawSprite(ctx, 'bun', cx - 44, cy - 14, 88, 38)) {
+  const cy = r.y + 32;
+  if (!drawSprite(ctx, 'bun', cx - 48, cy - 16, 96, 40)) {
     ctx.fillStyle = PALETTE.bun;
-    roundRect(ctx, cx - 40, cy - 10, 80, 22, 11);
+    roundRect(ctx, cx - 42, cy - 10, 84, 24, 12);
     ctx.fill();
   }
 }
 
-function drawKetchupIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
-  const cx = r.x + r.w / 2;
-  const cy = r.y + 16;
+function drawKetchupIcon(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.fillStyle = PALETTE.ketchup;
-  roundRect(ctx, cx - 9, cy, 18, 30, 7);
+  roundRect(ctx, x - 9, y, 18, 30, 7);
   ctx.fill();
   ctx.fillStyle = '#7a1d13';
-  roundRect(ctx, cx - 5, cy - 8, 10, 9, 3);
+  roundRect(ctx, x - 5, y - 8, 10, 9, 3);
   ctx.fill();
 }
 
-function drawDrinkIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
-  const cx = r.x + r.w / 2;
-  const cy = r.y + 10;
+function drawDrinkIcon(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.fillStyle = '#dfe6ec';
   ctx.beginPath();
-  ctx.moveTo(cx - 13, cy);
-  ctx.lineTo(cx + 13, cy);
-  ctx.lineTo(cx + 9, cy + 34);
-  ctx.lineTo(cx - 9, cy + 34);
+  ctx.moveTo(x - 13, y);
+  ctx.lineTo(x + 13, y);
+  ctx.lineTo(x + 9, y + 32);
+  ctx.lineTo(x - 9, y + 32);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = PALETTE.drink;
-  ctx.fillRect(cx - 11, cy + 4, 22, 12);
+  ctx.fillRect(x - 11, y + 4, 22, 12);
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx + 4, cy - 8);
-  ctx.lineTo(cx + 7, cy + 30);
+  ctx.moveTo(x + 4, y - 8);
+  ctx.lineTo(x + 7, y + 28);
   ctx.stroke();
 }
 
 function drawTrashIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
   const cx = r.x + r.w / 2;
-  const cy = r.y + 10;
+  const cy = r.y + 12;
   ctx.fillStyle = '#5a5550';
-  roundRect(ctx, cx - 14, cy, 28, 34, 4);
+  roundRect(ctx, cx - 15, cy, 30, 36, 4);
   ctx.fill();
   ctx.fillStyle = '#74706a';
-  roundRect(ctx, cx - 18, cy - 6, 36, 8, 3);
+  roundRect(ctx, cx - 19, cy - 6, 38, 8, 3);
   ctx.fill();
   ctx.strokeStyle = '#2a2824';
   ctx.lineWidth = 2;
-  for (const dx of [-6, 0, 6]) {
+  for (const dx of [-7, 0, 7]) {
     ctx.beginPath();
     ctx.moveTo(cx + dx, cy + 6);
-    ctx.lineTo(cx + dx, cy + 28);
+    ctx.lineTo(cx + dx, cy + 30);
     ctx.stroke();
   }
 }
 
 function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
-  const p = state.plate;
-  const can: Record<Station, boolean> = {
-    bun: !p,
-    ketchup: !!p && p.sausage !== null && !p.ketchup,
-    drink: !p || !p.drink,
-    trash: true,
-  };
-  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', can.bun);
+  const p = state.activePlate >= 0 ? state.plates[state.activePlate] : null;
+  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', state.plates.includes(null));
   drawBunIcon(ctx, STATION_RECTS.bun);
-  drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', can.ketchup);
-  drawKetchupIcon(ctx, STATION_RECTS.ketchup);
-  drawStationBox(ctx, STATION_RECTS.drink, 'Drink', can.drink);
-  drawDrinkIcon(ctx, STATION_RECTS.drink);
+  drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', !!p && p.sausage !== null && !p.ketchup);
+  drawKetchupIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 16);
+  drawStationBox(ctx, STATION_RECTS.drink, 'Drink', (!!p && !p.drink) || state.plates.includes(null));
+  drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
   drawStationBox(ctx, STATION_RECTS.trash, 'Trash', false);
   drawTrashIcon(ctx, STATION_RECTS.trash);
 }
 
-// ---------------------------------------------------------------------------
-// Grill
-// ---------------------------------------------------------------------------
+// ---- grill ----
 function sausageKeyFor(dog: Dog): SpriteKey {
   if (isBurnt(dog.cook)) return 'sausageBurnt';
   return dog.cook < COOK.perfectFrom ? 'sausageRaw' : 'sausageCooked';
@@ -139,7 +122,6 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (let s = 0; s < GRILL.slots; s++) {
     const r = grillSlotRect(s);
     const dog = state.dogs.find((d) => d.slot === s);
-
     ctx.fillStyle = dog ? PALETTE.grillHot : PALETTE.grillCold;
     roundRect(ctx, r.x, r.y, r.w, r.h, 10);
     ctx.fill();
@@ -152,7 +134,6 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
       ctx.lineTo(gx, r.y + r.h - 6);
       ctx.stroke();
     }
-
     if (!dog) {
       ctx.fillStyle = PALETTE.muted;
       ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
@@ -163,27 +144,32 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
     }
     drawDog(ctx, dog, r);
   }
+  // grill label
+  ctx.fillStyle = PALETTE.muted;
+  ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('GRILL', BOARD.width / 2, GRILL.y - 6);
 }
 
 function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   const cx = r.x + r.w / 2;
-  const cy = r.y + r.h / 2 - 4;
-  const sw = 96;
-  const sh = (sw * 44) / 120;
-  drawSprite(ctx, sausageKeyFor(dog), cx - sw / 2, cy - sh / 2, sw, sh);
+  const cy = r.y + r.h / 2 - 6;
+  const sw = 104;
+  drawSprite(ctx, sausageKeyFor(dog), cx - sw / 2, cy - (sw * 44) / 120 / 2, sw, (sw * 44) / 120);
 
   if (isBurnt(dog.cook)) {
     ctx.fillStyle = PALETTE.ember;
     ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🔥 burnt — trash it', cx, r.y + r.h - 11);
+    ctx.fillText('🔥 burnt — trash it', cx, r.y + r.h - 12);
     return;
   }
 
   const meterW = r.w - 20;
   const mx = r.x + 10;
-  const my = r.y + r.h - 12;
+  const my = r.y + r.h - 13;
   ctx.fillStyle = PALETTE.meterBg;
   roundRect(ctx, mx, my, meterW, 6, 3);
   ctx.fill();
@@ -197,51 +183,23 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   ctx.fill();
 }
 
-// ---------------------------------------------------------------------------
-// Plate (assembly)
-// ---------------------------------------------------------------------------
-function drawPlate(ctx: CanvasRenderingContext2D, plate: Plate | null): void {
-  const r = PLATE_RECT;
-  // plate dish
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  roundRect(ctx, r.x, r.y, r.w, r.h, 14);
-  ctx.fill();
-  ctx.fillStyle = PALETTE.plate;
-  ctx.beginPath();
-  ctx.ellipse(r.x + r.w / 2, r.y + r.h - 26, r.w / 2 - 8, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = PALETTE.muted;
-  ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
-  ctx.textBaseline = 'top';
-  ctx.fillText('PLATE', r.x + r.w / 2, r.y + 4);
-
-  if (!plate || (plate.sausage === null && !plate.drink && !plate.ketchup && !plate.bun)) {
-    ctx.fillStyle = PALETTE.muted;
-    ctx.font = 'italic 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('assemble here', r.x + r.w / 2, r.y + r.h / 2);
-    return;
-  }
-
+// ---- prep table ----
+function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect): void {
   const cx = r.x + r.w / 2;
-  const cy = r.y + r.h - 40;
-  if (plate.bun) {
-    if (!drawSprite(ctx, 'bun', cx - 56, cy - 6, 100, 44)) {
-      ctx.fillStyle = PALETTE.bun;
-      roundRect(ctx, cx - 50, cy, 90, 24, 12);
-      ctx.fill();
-    }
+  const cy = r.y + r.h - 42;
+  if (plate.bun && !drawSprite(ctx, 'bun', cx - 56, cy - 8, 104, 44)) {
+    ctx.fillStyle = PALETTE.bun;
+    roundRect(ctx, cx - 50, cy, 94, 24, 12);
+    ctx.fill();
   }
   if (plate.sausage) {
-    drawSprite(ctx, 'sausageCooked', cx - 44, cy - 2, 88, 32);
+    drawSprite(ctx, 'sausageCooked', cx - 46, cy - 2, 92, 34);
     if (plate.ketchup) {
       ctx.strokeStyle = PALETTE.ketchup;
       ctx.lineWidth = 4;
       ctx.beginPath();
       for (let i = 0; i <= 6; i++) {
-        const px = cx - 36 + i * 12;
+        const px = cx - 38 + i * 13;
         const py = cy + 6 + (i % 2 === 0 ? -4 : 4);
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
@@ -249,14 +207,49 @@ function drawPlate(ctx: CanvasRenderingContext2D, plate: Plate | null): void {
       ctx.stroke();
     }
   }
-  if (plate.drink) {
-    drawDrinkIcon(ctx, { x: r.x + r.w - 30, y: r.y + 16, w: 0, h: 0 });
-  }
+  if (plate.drink) drawDrinkIcon(ctx, r.x + r.w - 24, r.y + 14);
 }
 
-// ---------------------------------------------------------------------------
-// Customers + order tickets
-// ---------------------------------------------------------------------------
+function drawTable(ctx: CanvasRenderingContext2D, state: GameState): void {
+  for (let s = 0; s < TABLE.slots; s++) {
+    const r = tableSlotRect(s);
+    const plate = state.plates[s];
+    const isActive = state.activePlate === s && plate !== null;
+
+    // dish
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    roundRect(ctx, r.x, r.y, r.w, r.h, 14);
+    ctx.fill();
+    ctx.fillStyle = isActive ? PALETTE.plateActive : PALETTE.plate;
+    ctx.beginPath();
+    ctx.ellipse(r.x + r.w / 2, r.y + r.h - 26, r.w / 2 - 10, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isActive) {
+      ctx.strokeStyle = PALETTE.mustard;
+      ctx.lineWidth = 3;
+      roundRect(ctx, r.x, r.y, r.w, r.h, 14);
+      ctx.stroke();
+    }
+
+    ctx.textAlign = 'center';
+    if (!plate) {
+      ctx.fillStyle = PALETTE.muted;
+      ctx.font = 'italic 12px ui-sans-serif, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('empty', r.x + r.w / 2, r.y + r.h / 2);
+    } else {
+      drawPlateContents(ctx, plate, r);
+    }
+  }
+  ctx.fillStyle = PALETTE.muted;
+  ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('PREP TABLE — tap a plate to top it', BOARD.width / 2, TABLE.y - 6);
+}
+
+// ---- customers ----
 function orderText(order: Order): string {
   if (!order.sausage) return 'drink only';
   let t = 'hot dog';
@@ -279,7 +272,10 @@ function drawOrderIcons(ctx: CanvasRenderingContext2D, order: Order, cx: number,
 function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (const c of state.customers) {
     if (c.served) continue;
-    const r = customerSlotRect(c.slot);
+    const base = customerSlotRect(c.slot);
+    const oy = (1 - c.appear) * -20;
+    const r: Rect = { ...base, y: base.y + oy };
+    ctx.globalAlpha = 0.25 + 0.75 * c.appear;
     const impatient = c.patience / c.patienceMax < 0.35;
 
     ctx.fillStyle = PALETTE.customerBody;
@@ -290,31 +286,29 @@ function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
     roundRect(ctx, r.x, r.y, r.w, r.h, 12);
     ctx.stroke();
 
-    // face on the left
     const key: SpriteKey = c.id % 2 === 0 ? 'customer1' : 'customer2';
-    if (!drawSprite(ctx, key, r.x + 6, r.y + 8, 52, 52)) {
-      ctx.font = '30px serif';
+    if (!drawSprite(ctx, key, r.x + 6, r.y + 8, 50, 50)) {
+      ctx.font = '28px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(impatient ? '😠' : '🙂', r.x + 32, r.y + 32);
+      ctx.fillText(impatient ? '😠' : '🙂', r.x + 30, r.y + 30);
     }
     if (impatient) {
       ctx.font = '16px serif';
       ctx.fillText('💢', r.x + r.w - 16, r.y + 14);
     }
 
-    // order ticket on the right
-    const tx = r.x + 64;
+    const tx = r.x + 60;
+    const tw = r.w - 70;
     ctx.fillStyle = '#f7ecd9';
-    roundRect(ctx, tx, r.y + 10, r.w - 74, 46, 6);
+    roundRect(ctx, tx, r.y + 10, tw, 44, 6);
     ctx.fill();
     ctx.fillStyle = '#241712';
-    drawOrderIcons(ctx, c.order, tx + (r.w - 74) / 2, r.y + 26);
+    drawOrderIcons(ctx, c.order, tx + tw / 2, r.y + 25);
     ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(orderText(c.order), tx + (r.w - 74) / 2, r.y + 48);
+    ctx.fillText(orderText(c.order), tx + tw / 2, r.y + 46);
 
-    // patience bar
     const pw = r.w - 20;
     const px = r.x + 10;
     const py = r.y + r.h - 12;
@@ -325,12 +319,11 @@ function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.fillStyle = impatient ? PALETTE.patienceLow : PALETTE.patienceGood;
     roundRect(ctx, px, py, pw * frac, 6, 3);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cash tokens
-// ---------------------------------------------------------------------------
+// ---- cash + fx ----
 function drawCashTokens(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (const t of state.cashTokens) {
     const fade = Math.min(1, t.life / 1.2);
@@ -343,7 +336,7 @@ function drawCashTokens(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = '#0c3016';
-    ctx.font = '700 15px Arial Black, system-ui, sans-serif';
+    ctx.font = '700 16px Arial Black, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`$${t.amount}`, t.x, t.y);
@@ -369,7 +362,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
   drawBackground(ctx);
   drawStations(ctx, state);
   drawGrill(ctx, state);
-  drawPlate(ctx, state.plate);
+  drawTable(ctx, state);
   drawCustomers(ctx, state);
   drawCashTokens(ctx, state);
   drawFx(ctx, fx);
@@ -377,8 +370,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
   if (state.combo >= 2) {
     ctx.fillStyle = PALETTE.meterRaw;
     ctx.font = '700 18px Arial Black, system-ui, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width / 2, GRILL.y - 22);
+    ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width - 160, GRILL.y - 24);
   }
 }

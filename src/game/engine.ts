@@ -4,6 +4,7 @@ import type { Rect } from './geometry.ts';
 import {
   collectToken,
   createState,
+  selectPlate,
   serveCustomer,
   startGame,
   step,
@@ -96,6 +97,8 @@ export class Engine {
       if (res.reason === 'served') this.fxAt(r, `ORDER UP! +$${res.payout}`, PALETTE.cash);
       else if (res.reason === 'wrong-order') this.fxAt(r, 'WRONG ORDER', PALETTE.meterBurnt);
       else if (res.reason === 'empty-plate') this.fxAt(r, 'build it first', PALETTE.meterRaw);
+    } else if (target.kind === 'table') {
+      selectPlate(this.state, target.slot);
     } else if (target.kind === 'station') {
       const res = useStation(this.state, target.station);
       if (res === 'ok') this.fxAt(STATION_RECTS[target.station], STATION_LABEL[target.station], PALETTE.text);

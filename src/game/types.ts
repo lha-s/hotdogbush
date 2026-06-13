@@ -15,7 +15,7 @@ export interface Order {
   drink: boolean;
 }
 
-/** What the player has assembled on the plate. */
+/** A single build on the prep table. */
 export interface Plate {
   bun: boolean;
   sausage: Grade | null;
@@ -31,6 +31,7 @@ export interface Customer {
   patienceMax: number;
   served: boolean;
   leaving: boolean;
+  appear: number; // 0..1 entrance animation progress
 }
 
 /** Cash that lands on the counter after a serve; tap to collect before it disappears. */
@@ -54,7 +55,8 @@ export interface GameState {
   combo: number;
   dogs: Dog[];
   customers: Customer[];
-  plate: Plate | null;
+  plates: (Plate | null)[]; // prep table: one entry per TABLE.slots
+  activePlate: number; // index of the plate being topped, or -1
   cashTokens: CashToken[];
   nextDogId: number;
   nextCustomerId: number;

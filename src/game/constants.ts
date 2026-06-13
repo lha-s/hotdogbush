@@ -1,8 +1,8 @@
 // Tunable game balance. Kept in one place so difficulty is easy to reason about.
 
 export const BOARD = {
-  width: 800,
-  height: 500,
+  width: 960,
+  height: 560,
 } as const;
 
 // A play session is a fixed 90-second shift (matches the original Hot Dog Bush).
@@ -12,18 +12,27 @@ export const SHIFT = {
 
 export const GRILL = {
   slots: 3, // original grill has 3 sausage positions
-  slotW: 132,
-  slotH: 74,
-  y: 250, // top of grill row
-  gap: 16,
+  slotW: 150,
+  slotH: 84,
+  y: 180, // top of grill row
+  gap: 20,
+} as const;
+
+// Prep table — build several orders at once (original Table holds 3 breads).
+export const TABLE = {
+  slots: 3,
+  slotW: 150,
+  slotH: 150,
+  y: 304,
+  gap: 24,
 } as const;
 
 export const CUSTOMER = {
-  max: 4,
-  slotW: 172,
-  slotH: 116,
-  y: 14,
-  gap: 12,
+  max: 5, // original has 5 customer spots
+  slotW: 168,
+  slotH: 112,
+  y: 12,
+  gap: 10,
 } as const;
 
 // Cooking is measured in SECONDS of grill time and matches the original's doneness steps:
@@ -38,27 +47,29 @@ export const COOK = {
   meterMax: 24, // s — visual ceiling for the cook meter
 } as const;
 
-// Sausage values mirror the original (underdone 6, perfect 10, overdone 5). Ketchup and a
-// drink each add to the ticket total; a drink-only order pays just the drink value.
+// Economy mirrors the original: a hot dog = bun ($10) + sausage value ($6/$10/$5);
+// ketchup adds $3 when wanted (and docks $2 if wanted but missing); a drink adds $7.
 export const PAYOUT = {
-  perfect: 10,
-  good: 6, // underdone but servable
+  bun: 10,
+  perfect: 10, // sausage value by doneness
+  good: 6,
   overdone: 5,
-  ketchup: 2,
-  drink: 4,
+  ketchup: 3,
+  ketchupMiss: 2, // penalty when the order wanted ketchup and didn't get it
+  drink: 7,
   comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
   comboMax: 5,
 } as const;
 
 export const RULES = {
   spawnInterval: 8, // s — constant, matches original timerCustomers.Interval = 8000ms
-  patience: 13, // s — not specified in the original source; tuned so customers queue sensibly
+  patience: 15, // s — original turns a waiting customer sad after 15s (timers[i].Interval = 15000)
 } as const;
 
 // Cash that appears after a serve lingers on the counter, then vanishes (original moneyTimer = 2.5s).
 export const CASH = {
   life: 3.5, // s — a touch longer than the original so it's tappable on mobile
-  radius: 28, // px — tap target for collecting a cash token
+  radius: 30, // px — tap target for collecting a cash token
 } as const;
 
 // The five order combinations from the original OrderList (Sausage / Ketchup / Glass).
@@ -91,6 +102,7 @@ export const PALETTE = {
   mustard: '#f4b400',
   drink: '#7fc8e0',
   plate: '#cfd6dd',
+  plateActive: '#ffe79b',
   station: '#2a201a',
   stationActive: '#473527',
   cash: '#5fd07a',

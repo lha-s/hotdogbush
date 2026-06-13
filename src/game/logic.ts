@@ -1,4 +1,4 @@
-import { CASH, COOK, CUSTOMER, ORDER_COMBOS, PAYOUT, RULES, SHIFT } from './constants.ts';
+import { CASH, COOK, CUSTOMER, ORDER_COMBOS, PAYOUT, RULES, SHIFT, TABLE } from './constants.ts';
 import { customerSlotRect } from './geometry.ts';
 import type { CashToken, Customer, GameState, Grade, Order, Plate, Station } from './types.ts';
 
@@ -15,7 +15,8 @@ export function createState(): GameState {
     combo: 0,
     dogs: [],
     customers: [],
-    plate: null,
+    plates: Array.from({ length: TABLE.slots }, () => null),
+    activePlate: -1,
     cashTokens: [],
     nextDogId: 1,
     nextCustomerId: 1,
@@ -41,37 +42,47 @@ function gradePay(grade: Grade): number {
   return grade === 'perfect' ? PAYOUT.perfect : grade === 'good' ? PAYOUT.good : PAYOUT.overdone;
 }
 
-/** Total ticket value for an assembled plate (sausage doneness + ketchup + drink + combo). */
-export function platePayout(plate: Plate, combo: number): number {
-  let total = 0;
-  if (plate.sausage) total += gradePay(plate.sausage);
-  if (plate.ketchup) total += PAYOUT.ketchup;
-  if (plate.drink) total += PAYOUT.drink;
-  total += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
-  return total;
+/**
+ * Ticket value for an assembled plate against an order. Mirrors the original economy:
+ *   bun ($10) + sausage value, ketchup +$3 when wanted (−$2 when wanted but missing),
+ *   drink +$7, plus a small combo bonus.
+ */
+export function platePayout(plate: Plate, order: Order, combo: number): number {
+  let pay = 0;
+  if (plate.sausage) pay += PAYOUT.bun + gradePay(plate.sausage);
+  if (order.ketchup) pay += plate.ketchup ? PAYOUT.ketchup : -PAYOUT.ketchupMiss;
+  if (plate.drink) pay += PAYOUT.drink;
+  pay += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
+  return Math.max(0, pay);
 }
 
 // ---------------------------------------------------------------------------
 // Orders
 // ---------------------------------------------------------------------------
 export function generateOrder(rng: () => number = Math.random): Order {
-  const combo = ORDER_COMBOS[Math.floor(rng() * ORDER_COMBOS.length)];
-  return { ...combo };
+  return { ...ORDER_COMBOS[Math.floor(rng() * ORDER_COMBOS.length)] };
 }
 
+/** Order completes when sausage presence and drink presence match. Ketchup only affects pay. */
 export function plateMatchesOrder(plate: Plate, order: Order): boolean {
-  return (plate.sausage !== null) === order.sausage && plate.ketchup === order.ketchup && plate.drink === order.drink;
+  return (plate.sausage !== null) === order.sausage && plate.drink === order.drink;
 }
 
 export function plateIsEmpty(plate: Plate | null): boolean {
-  return !plate || (plate.sausage === null && !plate.drink && !plate.ketchup);
+  return !plate || (plate.sausage === null && !plate.drink && !plate.ketchup && !plate.bun);
+}
+
+function firstEmptySlot(state: GameState): number {
+  return state.plates.findIndex((p) => p === null);
+}
+
+function active(state: GameState): Plate | null {
+  return state.activePlate >= 0 ? state.plates[state.activePlate] : null;
 }
 
 // ---------------------------------------------------------------------------
 // Player actions
 // ---------------------------------------------------------------------------
-
-/** Tap an empty grill slot to start cooking a sausage. */
 export function startCooking(state: GameState, slot: number): boolean {
   if (state.phase !== 'playing') return false;
   if (state.dogs.some((d) => d.slot === slot)) return false;
@@ -81,7 +92,7 @@ export function startCooking(state: GameState, slot: number): boolean {
 
 export type GrillResult = 'cooking' | 'tossed' | 'plated' | 'need-bun' | 'busy' | 'none';
 
-/** Tap a grill slot: empty -> cook; burnt -> toss; cooked -> move onto the bun on the plate. */
+/** Tap a grill slot: empty -> cook; burnt -> toss; cooked -> move onto the active bun. */
 export function tapGrill(state: GameState, slot: number): GrillResult {
   if (state.phase !== 'playing') return 'none';
   const idx = state.dogs.findIndex((d) => d.slot === slot);
@@ -89,52 +100,68 @@ export function tapGrill(state: GameState, slot: number): GrillResult {
 
   const dog = state.dogs[idx];
   if (isBurnt(dog.cook)) {
-    state.dogs.splice(idx, 1); // scrape the burnt one into the trash
+    state.dogs.splice(idx, 1);
     return 'tossed';
   }
-  if (!state.plate || !state.plate.bun) return 'need-bun';
-  if (state.plate.sausage !== null) return 'busy'; // already has a sausage on the bun
-  state.plate.sausage = gradeOf(dog.cook);
+  const p = active(state);
+  if (!p || !p.bun) return 'need-bun';
+  if (p.sausage !== null) return 'busy';
+  p.sausage = gradeOf(dog.cook);
   state.dogs.splice(idx, 1);
   return 'plated';
 }
 
+export type TableResult = 'selected' | 'noop';
+
+/** Tap a prep-table slot to make it the active plate you're topping. */
+export function selectPlate(state: GameState, slot: number): TableResult {
+  if (state.phase !== 'playing') return 'noop';
+  if (slot < 0 || slot >= state.plates.length) return 'noop';
+  if (state.plates[slot] === null) return 'noop';
+  state.activePlate = slot;
+  return 'selected';
+}
+
 export type StationResult = 'ok' | 'noop';
 
-/** Tap a counter station to add to / clear the plate. */
 export function useStation(state: GameState, station: Station): StationResult {
   if (state.phase !== 'playing') return 'noop';
-  const p = state.plate;
+  const p = active(state);
   switch (station) {
-    case 'bun':
-      if (!p) {
-        state.plate = { bun: true, sausage: null, ketchup: false, drink: false };
-        return 'ok';
-      }
-      return 'noop';
+    case 'bun': {
+      const slot = firstEmptySlot(state);
+      if (slot === -1) return 'noop'; // table full
+      state.plates[slot] = { bun: true, sausage: null, ketchup: false, drink: false };
+      state.activePlate = slot;
+      return 'ok';
+    }
     case 'ketchup':
       if (p && p.sausage !== null && !p.ketchup) {
         p.ketchup = true;
         return 'ok';
       }
       return 'noop';
-    case 'drink':
-      if (!p) {
-        state.plate = { bun: false, sausage: null, ketchup: false, drink: true };
-        return 'ok';
-      }
-      if (!p.drink) {
+    case 'drink': {
+      if (p && !p.drink) {
         p.drink = true;
         return 'ok';
       }
+      if (!p) {
+        const slot = firstEmptySlot(state);
+        if (slot === -1) return 'noop';
+        state.plates[slot] = { bun: false, sausage: null, ketchup: false, drink: true };
+        state.activePlate = slot;
+        return 'ok';
+      }
       return 'noop';
+    }
     case 'trash':
-      if (p) {
-        state.plate = null; // bin the current build (even a lone bun)
+      if (state.activePlate >= 0 && state.plates[state.activePlate]) {
+        state.plates[state.activePlate] = null;
+        state.activePlate = -1;
         state.combo = 0;
         return 'ok';
       }
-      // nothing on the plate: scrape the most-burnt sausage off the grill, if any
       {
         const burntIdx = state.dogs.findIndex((d) => isBurnt(d.cook));
         if (burntIdx !== -1) {
@@ -152,43 +179,43 @@ export interface ServeResult {
   reason: 'served' | 'wrong-order' | 'empty-plate' | 'no-customer';
 }
 
-/** Hand the current plate to the customer in `slot`. */
+/** Hand the active plate to the customer in `slot`. */
 export function serveCustomer(state: GameState, slot: number): ServeResult {
   if (state.phase !== 'playing') return { ok: false, payout: 0, reason: 'no-customer' };
   const customer = state.customers.find((c) => c.slot === slot && !c.served && !c.leaving);
   if (!customer) return { ok: false, payout: 0, reason: 'no-customer' };
-  if (plateIsEmpty(state.plate)) return { ok: false, payout: 0, reason: 'empty-plate' };
 
-  const plate = state.plate as Plate;
+  const p = active(state);
+  if (plateIsEmpty(p)) return { ok: false, payout: 0, reason: 'empty-plate' };
+  const plate = p as Plate;
+
+  const clearActive = () => {
+    state.plates[state.activePlate] = null;
+    state.activePlate = -1;
+  };
+
   if (!plateMatchesOrder(plate, customer.order)) {
-    state.plate = null; // wrong build is wasted
+    clearActive();
     state.combo = 0;
     state.wrong += 1;
     return { ok: false, payout: 0, reason: 'wrong-order' };
   }
 
-  const payout = platePayout(plate, state.combo);
+  const payout = platePayout(plate, customer.order, state.combo);
   customer.served = true;
   state.combo += 1;
   state.served += 1;
-  state.plate = null;
+  clearActive();
   spawnCashToken(state, slot, payout);
   return { ok: true, payout, reason: 'served' };
 }
 
 function spawnCashToken(state: GameState, slot: number, amount: number): void {
   const r = customerSlotRect(slot);
-  state.cashTokens.push({
-    id: state.nextTokenId++,
-    amount,
-    x: r.x + r.w / 2,
-    y: r.y + r.h - 8,
-    life: CASH.life,
-  });
+  state.cashTokens.push({ id: state.nextTokenId++, amount, x: r.x + r.w / 2, y: r.y + r.h + 18, life: CASH.life });
   state.pending += amount;
 }
 
-/** Collect a cash token (by tap). Returns the amount collected, or 0 if none there. */
 export function collectToken(state: GameState, tokenId: number): number {
   const idx = state.cashTokens.findIndex((t) => t.id === tokenId);
   if (idx === -1) return 0;
@@ -199,7 +226,6 @@ export function collectToken(state: GameState, tokenId: number): number {
   return amount;
 }
 
-/** Topmost cash token under a point, or null. */
 export function tokenAt(state: GameState, px: number, py: number): CashToken | null {
   for (let i = state.cashTokens.length - 1; i >= 0; i--) {
     const t = state.cashTokens[i];
@@ -212,9 +238,9 @@ export function tokenAt(state: GameState, px: number, py: number): CashToken | n
 // Simulation
 // ---------------------------------------------------------------------------
 function spawnCustomer(state: GameState, rng: () => number): void {
-  const active = state.customers.filter((c) => !c.leaving);
-  if (active.length >= CUSTOMER.max) return;
-  const used = new Set(active.map((c) => c.slot));
+  const activeCustomers = state.customers.filter((c) => !c.leaving);
+  if (activeCustomers.length >= CUSTOMER.max) return;
+  const used = new Set(activeCustomers.map((c) => c.slot));
   let slot = 0;
   while (used.has(slot) && slot < CUSTOMER.max) slot++;
   if (slot >= CUSTOMER.max) return;
@@ -226,6 +252,7 @@ function spawnCustomer(state: GameState, rng: () => number): void {
     patienceMax: RULES.patience,
     served: false,
     leaving: false,
+    appear: 0,
   };
   state.customers.push(c);
 }
@@ -239,6 +266,7 @@ export function step(state: GameState, dt: number, rng: () => number = Math.rand
 
   let missed = false;
   for (const c of state.customers) {
+    if (c.appear < 1) c.appear = Math.min(1, c.appear + dt * 4);
     if (c.served || c.leaving) continue;
     c.patience -= dt;
     if (c.patience <= 0) {
@@ -251,10 +279,8 @@ export function step(state: GameState, dt: number, rng: () => number = Math.rand
   }
   state.customers = state.customers.filter((c) => !c.served && !(c.leaving && c.patience <= 0));
 
-  // cash tokens expire (uncollected cash is lost)
   for (const t of state.cashTokens) t.life -= dt;
-  const expired = state.cashTokens.filter((t) => t.life <= 0);
-  for (const t of expired) state.pending -= t.amount;
+  for (const t of state.cashTokens.filter((t) => t.life <= 0)) state.pending -= t.amount;
   state.cashTokens = state.cashTokens.filter((t) => t.life > 0);
 
   state.spawnTimer -= dt;
@@ -264,7 +290,6 @@ export function step(state: GameState, dt: number, rng: () => number = Math.rand
   }
 
   if (state.timeLeft <= 0 && state.phase === 'playing') {
-    // shift's over — sweep any cash still on the counter into the till
     state.cash += state.pending;
     state.pending = 0;
     state.cashTokens = [];

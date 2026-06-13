@@ -282,6 +282,16 @@ describe('step / shift', () => {
     expect(SHIFT.duration).toBe(90);
     expect(createState().timeLeft).toBe(90);
   });
+  test('a paused game is frozen by step()', () => {
+    const s = playing();
+    startCooking(s, 0);
+    s.phase = 'paused';
+    const before = { elapsed: s.elapsed, timeLeft: s.timeLeft, cook: s.dogs[0].cook };
+    step(s, 5, () => 0.5);
+    expect(s.elapsed).toBe(before.elapsed);
+    expect(s.timeLeft).toBe(before.timeLeft);
+    expect(s.dogs[0].cook).toBe(before.cook);
+  });
 });
 
 describe('speed-mode progression helpers', () => {

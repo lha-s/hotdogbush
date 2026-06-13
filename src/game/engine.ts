@@ -68,6 +68,17 @@ export class Engine {
     return this.state.phase;
   }
 
+  get paused() {
+    return this.state.phase === 'paused';
+  }
+
+  /** Freeze/resume the sim. step() already no-ops unless phase==='playing'. */
+  setPaused(p: boolean): void {
+    if (p && this.state.phase === 'playing') this.state.phase = 'paused';
+    else if (!p && this.state.phase === 'paused') this.state.phase = 'playing';
+    this.last = 0; // avoid a dt jump on resume
+  }
+
   start(): void {
     startGame(this.state);
     this.fx = [];

@@ -1,4 +1,4 @@
-export type GamePhase = 'start' | 'playing' | 'gameover';
+export type GamePhase = 'start' | 'playing' | 'paused' | 'gameover';
 
 export type Grade = 'perfect' | 'good' | 'overdone';
 

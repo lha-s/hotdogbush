@@ -25,6 +25,7 @@ const hud = $('#hud');
 const hudCash = $('#hudCash');
 const hudServed = $('#hudServed');
 const hudTime = $('#hudTime');
+const pauseBtn = $<HTMLButtonElement>('#pauseBtn');
 const roundTimer = $('#roundTimer');
 
 // remember the player's name across runs
@@ -86,6 +87,24 @@ const engine = new Engine(canvas, {
 void preloadSprites(); // non-blocking; renderer falls back to procedural art until ready
 engine.run();
 
+// --- pause control ---
+function setPaused(p: boolean): void {
+  engine.setPaused(p);
+  pauseBtn.setAttribute('aria-pressed', String(p));
+  pauseBtn.textContent = p ? '▶ Resume' : '⏸ Pause';
+  if (p) {
+    overlay.hidden = false;
+    overlay.innerHTML = `<h2>Paused</h2><button class="btn btn--play" id="resumeBtn">Resume shift</button>`;
+    $('#resumeBtn').addEventListener('click', () => setPaused(false), { once: true });
+  } else {
+    overlay.hidden = true;
+  }
+}
+pauseBtn.addEventListener('click', () => {
+  if (engine.phase !== 'playing' && engine.phase !== 'paused') return;
+  setPaused(!engine.paused);
+});
+
 // --- overlay states ---
 function showStart(): void {
   overlay.hidden = false;
@@ -105,6 +124,8 @@ function showStart(): void {
 function beginRun(): void {
   overlay.hidden = true;
   hud.hidden = false;
+  pauseBtn.textContent = '⏸ Pause';
+  pauseBtn.setAttribute('aria-pressed', 'false');
   engine.start();
 }
 

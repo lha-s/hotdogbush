@@ -1,4 +1,4 @@
-import { CASH, COOK, CUSTOMER, ORDER_COMBOS, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE } from './constants.ts';
+import { CASH, COOK, CUSTOMER, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from './constants.ts';
 import { customerSlotRect } from './geometry.ts';
 import type { CashToken, Customer, GameState, Grade, Order, Plate } from './types.ts';
 
@@ -77,27 +77,48 @@ function gradePay(grade: Grade): number {
 export function platePayout(plate: Plate, order: Order, combo: number): number {
   let pay = 0;
   if (plate.sausage) pay += PAYOUT.bun + gradePay(plate.sausage);
+  if (plate.patty) pay += PAYOUT.burgerBun + gradePay(plate.patty);
   if (order.ketchup) pay += plate.ketchup ? PAYOUT.ketchup : -PAYOUT.ketchupMiss;
   if (plate.drink) pay += PAYOUT.drink;
   pay += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
   return Math.max(0, pay);
 }
 
+/** A fresh, empty plate with all components cleared. */
+function emptyPlate(over: Partial<Plate> = {}): Plate {
+  return { bun: false, burgerBun: false, sausage: null, patty: null, fries: null, onion: false, ketchup: false, mustard: false, drink: false, ...over };
+}
+
 // ---------------------------------------------------------------------------
 // Orders
 // ---------------------------------------------------------------------------
-export function generateOrder(rng: () => number = Math.random): Order {
-  return { ...ORDER_COMBOS[Math.floor(rng() * ORDER_COMBOS.length)] };
+/** Time-aware order generation: only includes items unlocked by `elapsed`. */
+export function generateOrder(rng: () => number = Math.random, elapsed = Infinity): Order {
+  const burgerOk = elapsed >= UNLOCK.burger;
+  const useBurger = burgerOk && rng() < 0.45;
+  return {
+    sausage: !useBurger,
+    burger: useBurger,
+    ketchup: rng() < 0.4,
+    mustard: false, // unlocked in a later phase
+    drink: rng() < 0.4,
+    fries: false,
+    onion: false,
+  };
 }
 
-/** Order completes when sausage presence and drink presence match. Ketchup only affects pay. */
+/** Order completes when every wanted FOOD is present. Condiments (ketchup/mustard) are pay-only. */
 export function plateMatchesOrder(plate: Plate, order: Order): boolean {
-  return (plate.sausage !== null) === order.sausage && plate.drink === order.drink;
+  return (
+    (plate.sausage !== null) === order.sausage &&
+    (plate.patty !== null) === order.burger &&
+    plate.drink === order.drink
+  );
 }
 
 export function plateIsEmpty(plate: Plate | null): boolean {
-  // A lone bun isn't servable — only sausage/drink/ketchup count as real contents.
-  return !plate || (plate.sausage === null && !plate.drink && !plate.ketchup);
+  // A lone bun isn't servable — only real contents count.
+  return !plate || (plate.sausage === null && plate.patty === null && !plate.drink && !plate.ketchup);
 }
 
 function firstEmptySlot(state: GameState): number {
@@ -107,10 +128,10 @@ function firstEmptySlot(state: GameState): number {
 // ---------------------------------------------------------------------------
 // Taps (no drag): cook / toss a burnt dog / drop a fresh bun on the table
 // ---------------------------------------------------------------------------
-export function startCooking(state: GameState, slot: number): boolean {
+export function startCooking(state: GameState, slot: number, kind: 'sausage' | 'patty' = 'sausage'): boolean {
   if (state.phase !== 'playing') return false;
   if (state.dogs.some((d) => d.slot === slot)) return false;
-  state.dogs.push({ id: state.nextDogId++, slot, cook: 0 });
+  state.dogs.push({ id: state.nextDogId++, kind, station: 'grill', slot, cook: 0 });
   return true;
 }
 
@@ -128,12 +149,21 @@ export function tapGrill(state: GameState, slot: number): GrillTap {
   return 'grab';
 }
 
-/** Tap the Bun station to place a fresh bun on the next empty table plate. Returns the slot, or -1. */
+/** Tap the Bun station to place a fresh hot-dog bun on the next empty table plate. Returns slot or -1. */
 export function placeBun(state: GameState): number {
   if (state.phase !== 'playing') return -1;
   const slot = firstEmptySlot(state);
   if (slot === -1) return -1;
-  state.plates[slot] = { bun: true, sausage: null, ketchup: false, drink: false };
+  state.plates[slot] = emptyPlate({ bun: true });
+  return slot;
+}
+
+/** Tap the Burger-Bun station to place a fresh burger bun on the next empty table plate. */
+export function placeBurgerBun(state: GameState): number {
+  if (state.phase !== 'playing') return -1;
+  const slot = firstEmptySlot(state);
+  if (slot === -1) return -1;
+  state.plates[slot] = emptyPlate({ burgerBun: true });
   return slot;
 }
 
@@ -142,24 +172,33 @@ export function placeBun(state: GameState): number {
 // ---------------------------------------------------------------------------
 export type DropResult = 'ok' | 'need-bun' | 'busy' | 'bad';
 
-/** Drag a cooked sausage from the grill onto a bun on the table. */
-export function dropSausageOnPlate(state: GameState, dogId: number, plateSlot: number): DropResult {
+/** Drag a cooked sausage/patty from the grill onto the matching bun on the table. */
+export function dropCookedOnPlate(state: GameState, itemId: number, plateSlot: number): DropResult {
   if (state.phase !== 'playing') return 'bad';
-  const dog = state.dogs.find((d) => d.id === dogId);
-  if (!dog || isBurnt(dog.cook)) return 'bad';
+  const item = state.dogs.find((d) => d.id === itemId);
+  if (!item || isBurnt(item.cook)) return 'bad';
   const plate = state.plates[plateSlot];
-  if (!plate || !plate.bun) return 'need-bun';
-  if (plate.sausage !== null) return 'busy';
-  plate.sausage = gradeOf(dog.cook);
-  state.dogs = state.dogs.filter((d) => d.id !== dogId);
+  if (!plate) return 'need-bun';
+  if (item.kind === 'sausage') {
+    if (!plate.bun) return 'need-bun';
+    if (plate.sausage !== null) return 'busy';
+    plate.sausage = gradeOf(item.cook);
+  } else if (item.kind === 'patty') {
+    if (!plate.burgerBun) return 'need-bun';
+    if (plate.patty !== null) return 'busy';
+    plate.patty = gradeOf(item.cook);
+  } else {
+    return 'bad';
+  }
+  state.dogs = state.dogs.filter((d) => d.id !== itemId);
   return 'ok';
 }
 
-/** Drag the ketchup bottle onto a dog. */
+/** Drag the ketchup bottle onto a protein. */
 export function dropKetchup(state: GameState, plateSlot: number): boolean {
   if (state.phase !== 'playing') return false;
   const plate = state.plates[plateSlot];
-  if (plate && plate.sausage !== null && !plate.ketchup) {
+  if (plate && (plate.sausage !== null || plate.patty !== null) && !plate.ketchup) {
     plate.ketchup = true;
     return true;
   }
@@ -175,14 +214,14 @@ export function dropDrink(state: GameState, plateSlot: number): boolean {
     plate.drink = true;
     return true;
   }
-  state.plates[plateSlot] = { bun: false, sausage: null, ketchup: false, drink: true };
+  state.plates[plateSlot] = emptyPlate({ drink: true });
   return true;
 }
 
-/** Drag a sausage or a plate into the trash. */
-export function trashSausage(state: GameState, dogId: number): boolean {
+/** Drag a cook item into the trash. */
+export function trashItem(state: GameState, itemId: number): boolean {
   const before = state.dogs.length;
-  state.dogs = state.dogs.filter((d) => d.id !== dogId);
+  state.dogs = state.dogs.filter((d) => d.id !== itemId);
   return state.dogs.length < before;
 }
 
@@ -264,7 +303,7 @@ function spawnCustomer(state: GameState, rng: () => number): void {
   const c: Customer = {
     id: state.nextCustomerId++,
     slot,
-    order: generateOrder(rng),
+    order: generateOrder(rng, state.elapsed),
     patience,
     patienceMax: patience,
     served: false,

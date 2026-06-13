@@ -2,24 +2,39 @@ export type GamePhase = 'start' | 'playing' | 'paused' | 'gameover';
 
 export type Grade = 'perfect' | 'good' | 'overdone';
 
-export interface Dog {
+export type FoodKind = 'sausage' | 'patty' | 'fries' | 'onion';
+export type CookStation = 'grill' | 'fryer' | 'pan';
+
+/** One item cooking on an appliance (generalizes the old Dog). */
+export interface CookItem {
   id: number;
+  kind: FoodKind;
+  station: CookStation;
   slot: number;
-  cook: number; // seconds of grill time elapsed
+  cook: number; // seconds on the appliance
 }
 
-/** What a customer wants. Mirrors the original's Order(Sausage, Ketchup, Glass) combos. */
+/** What a customer wants. Booleans = "is this item wanted". */
 export interface Order {
-  sausage: boolean;
+  sausage: boolean; // hot dog
+  burger: boolean;
   ketchup: boolean;
+  mustard: boolean;
   drink: boolean;
+  fries: boolean;
+  onion: boolean;
 }
 
-/** A single build on the prep table. */
+/** A single build (tray) on the prep table. */
 export interface Plate {
-  bun: boolean;
+  bun: boolean; // hot-dog bun
+  burgerBun: boolean;
   sausage: Grade | null;
+  patty: Grade | null;
+  fries: Grade | null;
+  onion: boolean;
   ketchup: boolean;
+  mustard: boolean;
   drink: boolean;
 }
 
@@ -53,7 +68,7 @@ export interface GameState {
   missed: number; // customers who walked off
   wrong: number; // wrong orders handed over
   combo: number;
-  dogs: Dog[];
+  dogs: CookItem[]; // cooking items on the grill (and later fryer/pan)
   customers: Customer[];
   plates: (Plate | null)[]; // prep table: one entry per TABLE.slots
   cashTokens: CashToken[];
@@ -63,7 +78,7 @@ export interface GameState {
   spawnTimer: number;
 }
 
-export type Station = 'bun' | 'ketchup' | 'drink' | 'trash';
+export type Station = 'bun' | 'burgerBun' | 'ketchup' | 'drink' | 'trash' | 'rawPatty';
 
 export interface ServeFx {
   x: number;

@@ -3,17 +3,19 @@ import { targetAt } from './geometry.ts';
 import {
   collectToken,
   createState,
+  dropCookedOnPlate,
   dropDrink,
   dropKetchup,
-  dropSausageOnPlate,
   placeBun,
+  placeBurgerBun,
   servePlate,
+  startCooking,
   startGame,
   step,
   tapGrill,
   tokenAt,
+  trashItem,
   trashPlate,
-  trashSausage,
 } from './logic.ts';
 import { render } from './render.ts';
 import type { GameState, ServeFx } from './types.ts';
@@ -25,7 +27,7 @@ export interface EngineHooks {
 
 const DRAG_THRESHOLD = 8; // board px before a press becomes a drag
 
-export type DragKind = 'sausage' | 'plate' | 'ketchup' | 'drink';
+export type DragKind = 'sausage' | 'patty' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty';
 export interface DragState {
   kind: DragKind;
   x: number;
@@ -123,8 +125,9 @@ export class Engine {
     const t = targetAt(x, y);
     if (!t) return null;
     if (t.kind === 'grill') {
-      const dog = this.state.dogs.find((d) => d.slot === t.slot);
-      if (dog && dog.cook < 21) return { kind: 'sausage', x, y, dogId: dog.id }; // burnt handled by tap-toss
+      const item = this.state.dogs.find((d) => d.slot === t.slot);
+      // burnt items are tossed by tapping; only pick up cookable ones
+      if (item && item.cook < 21) return { kind: item.kind === 'patty' ? 'patty' : 'sausage', x, y, dogId: item.id };
       return null;
     }
     if (t.kind === 'table') {
@@ -135,6 +138,7 @@ export class Engine {
     if (t.kind === 'station') {
       if (t.station === 'ketchup') return { kind: 'ketchup', x, y };
       if (t.station === 'drink') return { kind: 'drink', x, y };
+      if (t.station === 'rawPatty') return { kind: 'rawPatty', x, y };
     }
     return null;
   }
@@ -170,14 +174,18 @@ export class Engine {
     const t = targetAt(x, y);
     const onTrash = t?.kind === 'station' && t.station === 'trash';
 
-    if (drag.kind === 'sausage' && drag.dogId != null) {
+    if ((drag.kind === 'sausage' || drag.kind === 'patty') && drag.dogId != null) {
       if (onTrash) {
-        if (trashSausage(this.state, drag.dogId)) this.pushFx(x, y, 'trashed', PALETTE.meterBurnt);
+        if (trashItem(this.state, drag.dogId)) this.pushFx(x, y, 'trashed', PALETTE.meterBurnt);
       } else if (t?.kind === 'table') {
-        const res = dropSausageOnPlate(this.state, drag.dogId, t.slot);
+        const res = dropCookedOnPlate(this.state, drag.dogId, t.slot);
         if (res === 'ok') this.pushFx(x, y, 'on the bun', PALETTE.meterPerfect);
-        else if (res === 'need-bun') this.pushFx(x, y, 'needs a bun', PALETTE.meterRaw);
+        else if (res === 'need-bun') this.pushFx(x, y, drag.kind === 'patty' ? 'needs a burger bun' : 'needs a bun', PALETTE.meterRaw);
         else if (res === 'busy') this.pushFx(x, y, 'bun full', PALETTE.meterRaw);
+      }
+    } else if (drag.kind === 'rawPatty') {
+      if (t?.kind === 'grill' && startCooking(this.state, t.slot, 'patty')) {
+        this.pushFx(x, y, 'patty on!', PALETTE.meterPerfect);
       }
     } else if (drag.kind === 'plate' && drag.slot != null) {
       if (onTrash) {
@@ -203,6 +211,8 @@ export class Engine {
       if (res === 'tossed') this.pushFx(x, y, 'trashed', PALETTE.meterBurnt);
     } else if (t.kind === 'station' && t.station === 'bun') {
       if (placeBun(this.state) !== -1) this.pushFx(x, y, '+ bun', PALETTE.text);
+    } else if (t.kind === 'station' && t.station === 'burgerBun') {
+      if (placeBurgerBun(this.state) !== -1) this.pushFx(x, y, '+ burger bun', PALETTE.text);
     }
   }
 

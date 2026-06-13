@@ -6,7 +6,11 @@ export type SpriteKey =
   | 'sausageRaw'
   | 'sausageCooked'
   | 'sausageBurnt'
+  | 'pattyRaw'
+  | 'pattyCooked'
+  | 'pattyBurnt'
   | 'bun'
+  | 'burgerBun'
   | 'customer1'
   | 'customer2'
   | 'condiments';
@@ -16,7 +20,11 @@ const MANIFEST: Record<SpriteKey, string> = {
   sausageRaw: '/assets/sausage-raw.svg',
   sausageCooked: '/assets/sausage-cooked.svg',
   sausageBurnt: '/assets/sausage-burnt.svg',
+  pattyRaw: '/assets/patty-raw.svg',
+  pattyCooked: '/assets/patty-cooked.svg',
+  pattyBurnt: '/assets/patty-burnt.svg',
   bun: '/assets/bun.svg',
+  burgerBun: '/assets/burger-bun.svg',
   customer1: '/assets/customer-1.svg',
   customer2: '/assets/customer-2.svg',
   condiments: '/assets/condiments.svg',

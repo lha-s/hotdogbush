@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 72" width="128" height="72">
+  <defs><linearGradient id="bb" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#eab85f"/><stop offset="1" stop-color="#cf9438"/>
+  </linearGradient></defs>
+  <!-- top dome -->
+  <path d="M16 38 a48 30 0 0 1 96 0 z" fill="url(#bb)"/>
+  <!-- sesame -->
+  <g fill="#fff" opacity="0.75">
+    <ellipse cx="48" cy="26" rx="3" ry="1.6" transform="rotate(-20 48 26)"/>
+    <ellipse cx="64" cy="20" rx="3" ry="1.6"/>
+    <ellipse cx="80" cy="26" rx="3" ry="1.6" transform="rotate(20 80 26)"/>
+    <ellipse cx="56" cy="32" rx="3" ry="1.6"/>
+    <ellipse cx="72" cy="32" rx="3" ry="1.6"/>
+  </g>
+  <!-- bottom bun -->
+  <path d="M18 44 q46 16 92 0 v6 q0 12 -46 12 q-46 0 -46 -12 z" fill="url(#bb)"/>
+  <path d="M18 44 q46 16 92 0" fill="none" stroke="#b97f2e" stroke-width="2" opacity="0.5"/>
+</svg>

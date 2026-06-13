@@ -58,15 +58,19 @@ export const COOK = {
 // ketchup adds $3 when wanted (and docks $2 if wanted but missing); a drink adds $7.
 export const PAYOUT = {
   bun: 10,
-  perfect: 10, // sausage value by doneness
+  perfect: 10, // protein value by doneness (sausage & patty share the grade pay)
   good: 6,
   overdone: 5,
+  burgerBun: 10,
   ketchup: 3,
   ketchupMiss: 2, // penalty when the order wanted ketchup and didn't get it
   drink: 7,
   comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
   comboMax: 5,
 } as const;
+
+// Item unlock schedule (seconds into the shift). Items don't appear in orders before this.
+export const UNLOCK = { dog: 0, ketchup: 0, drink: 0, burger: 18, mustard: 18, fries: 45, onion: 45 } as const;
 
 // SPEED MODE (not career): no cash goal — race the 90s clock for the highest score.
 // Difficulty ramps over the shift: customers arrive faster and grow less patient.

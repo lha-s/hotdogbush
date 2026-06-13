@@ -42,7 +42,9 @@ export const STATION_RECTS: Record<Station, Rect> = {
   ketchup: { x: 10, y: 152, w: 130, h: 80 },
   trash: { x: 10, y: 244, w: 130, h: 84 },
   drink: { x: 10, y: 340, w: 130, h: 84 },
-  bun: { x: 300, y: 158, w: 150, h: 72 },
+  bun: { x: 284, y: 158, w: 130, h: 72 }, // hot-dog bun source (centre)
+  burgerBun: { x: 430, y: 158, w: 130, h: 72 }, // burger bun source (centre)
+  rawPatty: { x: 528, y: 452, w: 130, h: 84 }, // raw patties — drag onto the grill to cook
 };
 
 export type Target =

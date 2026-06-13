@@ -3,7 +3,7 @@ import { BOARD, CASH, COOK, GRILL, PALETTE, TABLE } from './constants.ts';
 import { STATION_RECTS, customerBubbleRect, customerSlotRect, grillSlotRect, tableSlotRect, targetAt } from './geometry.ts';
 import type { Rect } from './geometry.ts';
 import { gradeOf, isBurnt } from './logic.ts';
-import type { Dog, GameState, Order, Plate, ServeFx } from './types.ts';
+import type { CookItem, GameState, Order, Plate, ServeFx } from './types.ts';
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
@@ -102,22 +102,54 @@ function drawTrashIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
 
 function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
   const plates = state.plates;
-  const canKetchup = plates.some((p) => p && p.sausage !== null && !p.ketchup);
-  const canDrink = plates.includes(null) || plates.some((p) => p && !p.drink);
-  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', plates.includes(null));
+  const hasEmpty = plates.includes(null);
+  const canKetchup = plates.some((p) => p && (p.sausage !== null || p.patty !== null) && !p.ketchup);
+  const canDrink = hasEmpty || plates.some((p) => p && !p.drink);
+
+  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', hasEmpty);
   drawBunIcon(ctx, STATION_RECTS.bun);
+  drawStationBox(ctx, STATION_RECTS.burgerBun, 'Burger Bun', hasEmpty);
+  drawBurgerBunIcon(ctx, STATION_RECTS.burgerBun);
   drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', canKetchup);
   drawKetchupIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 16);
   drawStationBox(ctx, STATION_RECTS.drink, 'Drink', canDrink);
   drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
+  drawStationBox(ctx, STATION_RECTS.rawPatty, 'Patties', true);
+  drawPattyIcon(ctx, STATION_RECTS.rawPatty);
   drawStationBox(ctx, STATION_RECTS.trash, 'Trash', false);
   drawTrashIcon(ctx, STATION_RECTS.trash);
 }
 
+function drawBurgerBunIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
+  const cx = r.x + r.w / 2;
+  const cy = r.y + 28;
+  if (!drawSprite(ctx, 'burgerBun', cx - 44, cy - 16, 88, 44)) {
+    ctx.fillStyle = PALETTE.bun;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 36, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPattyIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
+  const cx = r.x + r.w / 2;
+  const cy = r.y + 30;
+  if (!drawSprite(ctx, 'pattyRaw', cx - 44, cy - 12, 88, 32)) {
+    ctx.fillStyle = '#b86464';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 38, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 // ---- grill ----
-function sausageKeyFor(dog: Dog): SpriteKey {
-  if (isBurnt(dog.cook)) return 'sausageBurnt';
-  return dog.cook < COOK.perfectFrom ? 'sausageRaw' : 'sausageCooked';
+function itemSpriteKey(item: CookItem): SpriteKey {
+  if (item.kind === 'patty') {
+    if (isBurnt(item.cook)) return 'pattyBurnt';
+    return item.cook < COOK.perfectFrom ? 'pattyRaw' : 'pattyCooked';
+  }
+  if (isBurnt(item.cook)) return 'sausageBurnt';
+  return item.cook < COOK.perfectFrom ? 'sausageRaw' : 'sausageCooked';
 }
 
 function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -154,13 +186,13 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.fillText('GRILL', GRILL.x + GRILL.slotW / 2, GRILL.y - 6);
 }
 
-function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
+function drawDog(ctx: CanvasRenderingContext2D, item: CookItem, r: Rect): void {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2 - 6;
   const sw = 104;
-  drawSprite(ctx, sausageKeyFor(dog), cx - sw / 2, cy - (sw * 44) / 120 / 2, sw, (sw * 44) / 120);
+  drawSprite(ctx, itemSpriteKey(item), cx - sw / 2, cy - (sw * 44) / 120 / 2, sw, (sw * 44) / 120);
 
-  if (isBurnt(dog.cook)) {
+  if (isBurnt(item.cook)) {
     ctx.fillStyle = PALETTE.ember;
     ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -179,13 +211,26 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   const zEnd = mx + meterW * (COOK.overdoneFrom / COOK.meterMax);
   ctx.fillStyle = 'rgba(95,168,58,0.4)';
   ctx.fillRect(zStart, my, zEnd - zStart, 6);
-  const grade = gradeOf(dog.cook);
+  const grade = gradeOf(item.cook);
   ctx.fillStyle = grade === 'perfect' ? PALETTE.meterPerfect : grade === 'good' ? PALETTE.meterRaw : PALETTE.meterBurnt;
-  roundRect(ctx, mx, my, meterW * Math.min(1, dog.cook / COOK.meterMax), 6, 3);
+  roundRect(ctx, mx, my, meterW * Math.min(1, item.cook / COOK.meterMax), 6, 3);
   ctx.fill();
 }
 
 // ---- prep table ----
+function drawKetchupZigzag(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+  ctx.strokeStyle = PALETTE.ketchup;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  for (let i = 0; i <= 6; i++) {
+    const px = cx - 38 + i * 13;
+    const py = cy + 6 + (i % 2 === 0 ? -4 : 4);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+
 function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect): void {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h - 42;
@@ -194,20 +239,19 @@ function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect)
     roundRect(ctx, cx - 50, cy, 94, 24, 12);
     ctx.fill();
   }
+  if (plate.burgerBun && !drawSprite(ctx, 'burgerBun', cx - 50, cy - 18, 100, 56)) {
+    ctx.fillStyle = PALETTE.bun;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 6, 42, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   if (plate.sausage) {
     drawSprite(ctx, 'sausageCooked', cx - 46, cy - 2, 92, 34);
-    if (plate.ketchup) {
-      ctx.strokeStyle = PALETTE.ketchup;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      for (let i = 0; i <= 6; i++) {
-        const px = cx - 38 + i * 13;
-        const py = cy + 6 + (i % 2 === 0 ? -4 : 4);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-    }
+    if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy);
+  }
+  if (plate.patty) {
+    drawSprite(ctx, 'pattyCooked', cx - 44, cy - 2, 88, 30);
+    if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy - 4);
   }
   if (plate.drink) drawDrinkIcon(ctx, r.x + r.w - 24, r.y + 14);
 }
@@ -371,7 +415,7 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: ServeFx[]): void {
 
 // ---- drag ghost + drop-target highlight ----
 export interface DragView {
-  kind: 'sausage' | 'plate' | 'ketchup' | 'drink';
+  kind: 'sausage' | 'patty' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty';
   x: number;
   y: number;
   slot?: number;
@@ -405,6 +449,14 @@ function drawDragGhost(ctx: CanvasRenderingContext2D, state: GameState, drag: Dr
     if (!drawSprite(ctx, 'sausageCooked', x - 48, y - 18, 96, 36)) {
       ctx.fillStyle = PALETTE.perfect;
       roundRect(ctx, x - 44, y - 11, 88, 22, 11);
+      ctx.fill();
+    }
+  } else if (drag.kind === 'patty' || drag.kind === 'rawPatty') {
+    const key = drag.kind === 'rawPatty' ? 'pattyRaw' : 'pattyCooked';
+    if (!drawSprite(ctx, key, x - 44, y - 16, 88, 32)) {
+      ctx.fillStyle = drag.kind === 'rawPatty' ? '#b86464' : '#5a3618';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 40, 13, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   } else if (drag.kind === 'ketchup') {

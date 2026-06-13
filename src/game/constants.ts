@@ -10,29 +10,36 @@ export const SHIFT = {
   duration: 90, // seconds
 } as const;
 
+// Layout mirrors the original's zones (our own art): customers across the top with order bubbles
+// above their faces; condiments + trash down the left; the GRILL stacked on the RIGHT; the prep
+// table and hot-dog buns in the centre.
 export const GRILL = {
-  slots: 3, // original grill has 3 sausage positions
-  slotW: 150,
-  slotH: 84,
-  y: 180, // top of grill row
-  gap: 20,
+  slots: 3, // original grill has 3 cook positions
+  x: 664, // right side
+  y: 150,
+  slotW: 284,
+  slotH: 80,
+  gap: 16, // stacked vertically
 } as const;
 
-// Prep table — build several orders at once (original Table holds 3 breads).
+// Prep table — build several orders at once (original Table holds 3 breads). Centre, horizontal.
 export const TABLE = {
   slots: 3,
+  x: 156,
   slotW: 150,
-  slotH: 150,
-  y: 304,
-  gap: 24,
+  slotH: 124,
+  y: 246,
+  gap: 22,
 } as const;
 
 export const CUSTOMER = {
   max: 5, // original has 5 customer spots
-  slotW: 168,
-  slotH: 112,
-  y: 12,
-  gap: 10,
+  slotW: 176,
+  slotH: 86, // face card; the order ticket renders in a bubble above it
+  y: 56,
+  gap: 12,
+  bubbleY: 2,
+  bubbleH: 50,
 } as const;
 
 // Cooking is measured in SECONDS of grill time and matches the original's doneness steps:

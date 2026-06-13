@@ -1,6 +1,6 @@
 import { sprite, type SpriteKey } from './assets.ts';
 import { BOARD, CASH, COOK, GRILL, PALETTE, TABLE } from './constants.ts';
-import { STATION_RECTS, customerSlotRect, grillSlotRect, tableSlotRect, targetAt } from './geometry.ts';
+import { STATION_RECTS, customerBubbleRect, customerSlotRect, grillSlotRect, tableSlotRect, targetAt } from './geometry.ts';
 import type { Rect } from './geometry.ts';
 import { gradeOf, isBurnt } from './logic.ts';
 import type { Dog, GameState, Order, Plate, ServeFx } from './types.ts';
@@ -151,7 +151,7 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('GRILL', BOARD.width / 2, GRILL.y - 6);
+  ctx.fillText('GRILL', GRILL.x + GRILL.slotW / 2, GRILL.y - 6);
 }
 
 function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
@@ -248,7 +248,7 @@ function drawTable(ctx: CanvasRenderingContext2D, state: GameState, hoverSlot: n
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('PREP TABLE — drop sausage / ketchup / drink here', BOARD.width / 2, TABLE.y - 6);
+  ctx.fillText('PREP TABLE — drop cooked items & toppings here', TABLE.x + (TABLE.slots * TABLE.slotW + (TABLE.slots - 1) * TABLE.gap) / 2, TABLE.y - 6);
 }
 
 // ---- customers ----
@@ -274,12 +274,33 @@ function drawOrderIcons(ctx: CanvasRenderingContext2D, order: Order, cx: number,
 function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (const c of state.customers) {
     if (c.served) continue;
-    const base = customerSlotRect(c.slot);
+    const face = customerSlotRect(c.slot);
+    const bubble = customerBubbleRect(c.slot);
     const oy = (1 - c.appear) * -20;
-    const r: Rect = { ...base, y: base.y + oy };
     ctx.globalAlpha = 0.25 + 0.75 * c.appear;
     const impatient = c.patience / c.patienceMax < 0.35;
 
+    // --- order bubble (above the face) ---
+    const b = { x: bubble.x, y: bubble.y + oy, w: bubble.w, h: bubble.h };
+    ctx.fillStyle = '#f7ecd9';
+    roundRect(ctx, b.x, b.y, b.w, b.h, 8);
+    ctx.fill();
+    // little tail pointing down to the face
+    ctx.beginPath();
+    ctx.moveTo(b.x + b.w / 2 - 8, b.y + b.h);
+    ctx.lineTo(b.x + b.w / 2 + 8, b.y + b.h);
+    ctx.lineTo(b.x + b.w / 2, b.y + b.h + 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#241712';
+    drawOrderIcons(ctx, c.order, b.x + b.w / 2, b.y + 18);
+    ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(orderText(c.order), b.x + b.w / 2, b.y + 38);
+
+    // --- face card ---
+    const r = { x: face.x, y: face.y + oy, w: face.w, h: face.h };
     ctx.fillStyle = PALETTE.customerBody;
     roundRect(ctx, r.x, r.y, r.w, r.h, 12);
     ctx.fill();
@@ -289,28 +310,18 @@ function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.stroke();
 
     const key: SpriteKey = c.id % 2 === 0 ? 'customer1' : 'customer2';
-    if (!drawSprite(ctx, key, r.x + 6, r.y + 8, 50, 50)) {
-      ctx.font = '28px serif';
+    if (!drawSprite(ctx, key, r.x + r.w / 2 - 28, r.y + 6, 56, 56)) {
+      ctx.font = '30px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(impatient ? '😠' : '🙂', r.x + 30, r.y + 30);
+      ctx.fillText(impatient ? '😠' : '🙂', r.x + r.w / 2, r.y + 32);
     }
     if (impatient) {
       ctx.font = '16px serif';
-      ctx.fillText('💢', r.x + r.w - 16, r.y + 14);
+      ctx.fillText('💢', r.x + r.w - 16, r.y + 16);
     }
 
-    const tx = r.x + 60;
-    const tw = r.w - 70;
-    ctx.fillStyle = '#f7ecd9';
-    roundRect(ctx, tx, r.y + 10, tw, 44, 6);
-    ctx.fill();
-    ctx.fillStyle = '#241712';
-    drawOrderIcons(ctx, c.order, tx + tw / 2, r.y + 25);
-    ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(orderText(c.order), tx + tw / 2, r.y + 46);
-
+    // patience bar
     const pw = r.w - 20;
     const px = r.x + 10;
     const py = r.y + r.h - 12;

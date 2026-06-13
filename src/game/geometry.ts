@@ -16,30 +16,33 @@ function rowStart(count: number, slotW: number, gap: number): number {
   return (BOARD.width - (count * slotW + (count - 1) * gap)) / 2;
 }
 
-// ---- grill ----
-const grillStartX = rowStart(GRILL.slots, GRILL.slotW, GRILL.gap);
+// ---- grill (right side, stacked vertically) ----
 export function grillSlotRect(slot: number): Rect {
-  return { x: grillStartX + slot * (GRILL.slotW + GRILL.gap), y: GRILL.y, w: GRILL.slotW, h: GRILL.slotH };
+  return { x: GRILL.x, y: GRILL.y + slot * (GRILL.slotH + GRILL.gap), w: GRILL.slotW, h: GRILL.slotH };
 }
 
-// ---- prep table ----
-const tableStartX = rowStart(TABLE.slots, TABLE.slotW, TABLE.gap);
+// ---- prep table (centre, horizontal) ----
 export function tableSlotRect(slot: number): Rect {
-  return { x: tableStartX + slot * (TABLE.slotW + TABLE.gap), y: TABLE.y, w: TABLE.slotW, h: TABLE.slotH };
+  return { x: TABLE.x + slot * (TABLE.slotW + TABLE.gap), y: TABLE.y, w: TABLE.slotW, h: TABLE.slotH };
 }
 
-// ---- customers ----
+// ---- customers (top row) ----
 const custStartX = rowStart(CUSTOMER.max, CUSTOMER.slotW, CUSTOMER.gap);
 export function customerSlotRect(slot: number): Rect {
   return { x: custStartX + slot * (CUSTOMER.slotW + CUSTOMER.gap), y: CUSTOMER.y, w: CUSTOMER.slotW, h: CUSTOMER.slotH };
 }
+/** The speech-bubble order ticket drawn above each customer's face. */
+export function customerBubbleRect(slot: number): Rect {
+  const face = customerSlotRect(slot);
+  return { x: face.x + 8, y: CUSTOMER.bubbleY, w: face.w - 16, h: CUSTOMER.bubbleH };
+}
 
-// ---- stations (counter, flanking the grill/table) ----
+// ---- stations: condiments + trash down the left, hot-dog buns centre ----
 export const STATION_RECTS: Record<Station, Rect> = {
-  bun: { x: 16, y: 180, w: 132, h: 92 },
-  ketchup: { x: 16, y: 300, w: 132, h: 92 },
-  drink: { x: BOARD.width - 148, y: 180, w: 132, h: 92 },
-  trash: { x: BOARD.width - 148, y: 300, w: 132, h: 92 },
+  ketchup: { x: 10, y: 152, w: 130, h: 80 },
+  trash: { x: 10, y: 244, w: 130, h: 84 },
+  drink: { x: 10, y: 340, w: 130, h: 84 },
+  bun: { x: 300, y: 158, w: 150, h: 72 },
 };
 
 export type Target =

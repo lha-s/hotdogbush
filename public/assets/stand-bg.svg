@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2018"/>
+      <stop offset="1" stop-color="#181009"/>
+    </linearGradient>
+    <linearGradient id="counter" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2418"/>
+      <stop offset="1" stop-color="#23150d"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#sky)"/>
+  <!-- string lights -->
+  <path d="M0 60 Q200 100 400 60 T800 60" fill="none" stroke="#4a3826" stroke-width="3"/>
+  <g fill="#f4b400">
+    <circle cx="120" cy="84" r="5"/><circle cx="260" cy="86" r="5"/><circle cx="400" cy="74" r="5"/>
+    <circle cx="540" cy="86" r="5"/><circle cx="680" cy="84" r="5"/>
+  </g>
+  <!-- awning stripes -->
+  <g>
+    <rect x="0" y="100" width="800" height="60" fill="#c14a35"/>
+    <g fill="#f7ecd9">
+      <rect x="40" y="100" width="60" height="60"/><rect x="180" y="100" width="60" height="60"/>
+      <rect x="320" y="100" width="60" height="60"/><rect x="460" y="100" width="60" height="60"/>
+      <rect x="600" y="100" width="60" height="60"/><rect x="740" y="100" width="60" height="60"/>
+    </g>
+    <path d="M0 160 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 l40 30 l40 -30 v-10 h-800 z" fill="#a83a28"/>
+  </g>
+  <!-- counter band -->
+  <rect x="0" y="350" width="800" height="150" fill="url(#counter)"/>
+  <rect x="0" y="348" width="800" height="8" fill="#0f0a07"/>
+</svg>

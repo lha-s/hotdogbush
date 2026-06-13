@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" width="80" height="60">
+  <!-- ketchup -->
+  <g transform="translate(8,6)">
+    <rect x="4" y="14" width="22" height="34" rx="10" fill="#e23a28"/>
+    <rect x="9" y="6" width="12" height="10" rx="3" fill="#b32a1c"/>
+    <rect x="12" y="0" width="6" height="8" rx="3" fill="#7a1d13"/>
+    <rect x="9" y="22" width="12" height="14" rx="4" fill="#fff" opacity="0.85"/>
+  </g>
+  <!-- mustard -->
+  <g transform="translate(46,6)">
+    <rect x="4" y="14" width="22" height="34" rx="10" fill="#f4b400"/>
+    <rect x="9" y="6" width="12" height="10" rx="3" fill="#c9930a"/>
+    <rect x="12" y="0" width="6" height="8" rx="3" fill="#8a6606"/>
+    <rect x="9" y="22" width="12" height="14" rx="4" fill="#fff" opacity="0.85"/>
+  </g>
+</svg>

@@ -1,11 +1,27 @@
+import { sprite, type SpriteKey } from './assets.ts';
 import { BOARD, COOK, GRILL, PALETTE } from './constants.ts';
 import { customerSlotRect, grillSlotRect } from './geometry.ts';
 import { gradeOf } from './logic.ts';
 import type { Dog, GameState, ServeFx } from './types.ts';
 
+type Rect = { x: number; y: number; w: number; h: number };
+
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
+}
+
+/** Draw a sprite fitted into a box (contain), centered. Returns false if not loaded. */
+function drawSprite(ctx: CanvasRenderingContext2D, key: SpriteKey, x: number, y: number, w: number, h: number): boolean {
+  const img = sprite(key);
+  if (!img) return false;
+  ctx.drawImage(img, x, y, w, h);
+  return true;
+}
+
+function sausageKeyFor(dog: Dog): SpriteKey {
+  if (dog.state === 'burnt') return 'sausageBurnt';
+  return dog.cook < COOK.rawUntil ? 'sausageRaw' : 'sausageCooked';
 }
 
 function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -53,14 +69,18 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2 - 4;
 
-  // sausage
-  ctx.fillStyle = dogColor(dog);
-  roundRect(ctx, cx - 46, cy - 11, 92, 22, 11);
-  ctx.fill();
-  // sheen
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  roundRect(ctx, cx - 40, cy - 8, 80, 6, 3);
-  ctx.fill();
+  // sprite first; procedural fallback if assets haven't loaded
+  const sw = 104;
+  const sh = (sw * 44) / 120;
+  const drawn = drawSprite(ctx, sausageKeyFor(dog), cx - sw / 2, cy - sh / 2, sw, sh);
+  if (!drawn) {
+    ctx.fillStyle = dogColor(dog);
+    roundRect(ctx, cx - 46, cy - 11, 92, 22, 11);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    roundRect(ctx, cx - 40, cy - 8, 80, 6, 3);
+    ctx.fill();
+  }
 
   if (dog.state === 'burnt') {
     ctx.fillStyle = PALETTE.ember;
@@ -93,36 +113,45 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   ctx.fill();
 }
 
-type Rect = { x: number; y: number; w: number; h: number };
-
 function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
   for (const c of state.customers) {
     if (c.served) continue;
     const r = customerSlotRect(c.slot);
+    const impatient = c.patience / c.patienceMax < 0.35;
 
-    // speech bubble / order card
+    // order card
     ctx.fillStyle = PALETTE.customerBody;
     roundRect(ctx, r.x, r.y, r.w, r.h, 12);
     ctx.fill();
-    ctx.strokeStyle = c.patience / c.patienceMax < 0.35 ? PALETTE.patienceLow : 'rgba(0,0,0,0.4)';
+    ctx.strokeStyle = impatient ? PALETTE.patienceLow : 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 3;
     roundRect(ctx, r.x, r.y, r.w, r.h, 12);
     ctx.stroke();
 
-    // face
-    ctx.font = '34px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const mood = c.patience / c.patienceMax < 0.35 ? '😠' : '🙂';
-    ctx.fillText(mood, r.x + r.w / 2, r.y + 34);
+    // customer sprite (alternate two faces by id), procedural emoji fallback
+    const key: SpriteKey = c.id % 2 === 0 ? 'customer1' : 'customer2';
+    const cs = 56;
+    const drawn = drawSprite(ctx, key, r.x + r.w / 2 - cs / 2, r.y + 6, cs, cs);
+    if (!drawn) {
+      ctx.font = '34px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(impatient ? '😠' : '🙂', r.x + r.w / 2, r.y + 34);
+    } else if (impatient) {
+      // anger mark when running out of patience
+      ctx.font = '18px serif';
+      ctx.fillText('💢', r.x + r.w - 22, r.y + 18);
+    }
 
     // order
     ctx.fillStyle = PALETTE.text;
     ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('1× hot dog 🌭', r.x + r.w / 2, r.y + 70);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('1× hot dog 🌭', r.x + r.w / 2, r.y + 74);
     ctx.fillStyle = PALETTE.muted;
     ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('cooked, not burnt', r.x + r.w / 2, r.y + 88);
+    ctx.fillText('cooked, not burnt', r.x + r.w / 2, r.y + 90);
 
     // patience bar
     const pw = r.w - 24;
@@ -132,7 +161,7 @@ function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {
     roundRect(ctx, px, py, pw, 6, 3);
     ctx.fill();
     const frac = Math.max(0, c.patience / c.patienceMax);
-    ctx.fillStyle = frac < 0.35 ? PALETTE.patienceLow : PALETTE.patienceGood;
+    ctx.fillStyle = impatient ? PALETTE.patienceLow : PALETTE.patienceGood;
     roundRect(ctx, px, py, pw * frac, 6, 3);
     ctx.fill();
   }
@@ -150,14 +179,23 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: ServeFx[]): void {
   ctx.globalAlpha = 1;
 }
 
-export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: ServeFx[], combo: number): void {
-  ctx.clearRect(0, 0, BOARD.width, BOARD.height);
-
-  // counter band behind the grill
+function drawBackground(ctx: CanvasRenderingContext2D): void {
+  if (drawSprite(ctx, 'bg', 0, 0, BOARD.width, BOARD.height)) return;
+  // procedural fallback backdrop
+  ctx.fillStyle = '#181009';
+  ctx.fillRect(0, 0, BOARD.width, BOARD.height);
   ctx.fillStyle = '#1a120d';
   ctx.fillRect(0, GRILL.y - 26, BOARD.width, BOARD.height - GRILL.y + 26);
   ctx.fillStyle = '#0f0a07';
   ctx.fillRect(0, GRILL.y - 30, BOARD.width, 6);
+}
+
+export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: ServeFx[], combo: number): void {
+  ctx.clearRect(0, 0, BOARD.width, BOARD.height);
+  drawBackground(ctx);
+
+  // condiment decor on the counter corners
+  drawSprite(ctx, 'condiments', BOARD.width - 92, GRILL.y - 50, 80, 60);
 
   drawCustomers(ctx, state);
   drawGrill(ctx, state);

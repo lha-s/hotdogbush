@@ -1,5 +1,6 @@
 import './style.css';
 import { Engine } from './game/engine.ts';
+import { preloadSprites } from './game/assets.ts';
 import { MAX_PLAUSIBLE_SCORE } from './game/constants.ts';
 import { Leaderboard } from './leaderboard/leaderboard.ts';
 import { fetchActiveRound, submitScore } from './leaderboard/api.ts';
@@ -81,6 +82,7 @@ const engine = new Engine(canvas, {
   onHud: paintHud,
   onGameOver: (finalCash, served) => showGameOver(finalCash, served),
 });
+void preloadSprites(); // non-blocking; renderer falls back to procedural art until ready
 engine.run();
 
 // --- overlay states ---

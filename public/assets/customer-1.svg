@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- original cartoon customer: round head, cap, neutral smile -->
+  <ellipse cx="48" cy="88" rx="30" ry="8" fill="#000" opacity="0.18"/>
+  <rect x="22" y="58" width="52" height="32" rx="12" fill="#c14a35"/>
+  <circle cx="48" cy="40" r="24" fill="#f2c79a"/>
+  <path d="M22 36 a26 26 0 0 1 52 0 l0 -2 q-26 -16 -52 0 z" fill="#3a2c22"/>
+  <rect x="20" y="30" width="56" height="8" rx="4" fill="#3a2c22"/>
+  <circle cx="40" cy="42" r="3" fill="#241712"/>
+  <circle cx="56" cy="42" r="3" fill="#241712"/>
+  <path d="M40 52 q8 6 16 0" fill="none" stroke="#7a4a2a" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

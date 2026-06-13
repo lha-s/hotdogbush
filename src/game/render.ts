@@ -53,11 +53,11 @@ function drawBunIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
   }
 }
 
-function drawKetchupIcon(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  ctx.fillStyle = PALETTE.ketchup;
+function drawBottleIcon(ctx: CanvasRenderingContext2D, x: number, y: number, body: string, cap: string): void {
+  ctx.fillStyle = body;
   roundRect(ctx, x - 9, y, 18, 30, 7);
   ctx.fill();
-  ctx.fillStyle = '#7a1d13';
+  ctx.fillStyle = cap;
   roundRect(ctx, x - 5, y - 8, 10, 9, 3);
   ctx.fill();
 }
@@ -110,8 +110,11 @@ function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
   drawBunIcon(ctx, STATION_RECTS.bun);
   drawStationBox(ctx, STATION_RECTS.burgerBun, 'Burger Bun', hasEmpty);
   drawBurgerBunIcon(ctx, STATION_RECTS.burgerBun);
+  const canMustard = plates.some((p) => p && (p.sausage !== null || p.patty !== null) && !p.mustard);
   drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', canKetchup);
-  drawKetchupIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 16);
+  drawBottleIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 14, PALETTE.ketchup, '#7a1d13');
+  drawStationBox(ctx, STATION_RECTS.mustard, 'Mustard', canMustard);
+  drawBottleIcon(ctx, STATION_RECTS.mustard.x + STATION_RECTS.mustard.w / 2, STATION_RECTS.mustard.y + 14, PALETTE.mustard, '#8a6606');
   drawStationBox(ctx, STATION_RECTS.drink, 'Drink', canDrink);
   drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
   drawStationBox(ctx, STATION_RECTS.rawPatty, 'Patties', true);
@@ -257,8 +260,8 @@ function drawAppliance(
 }
 
 // ---- prep table ----
-function drawKetchupZigzag(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-  ctx.strokeStyle = PALETTE.ketchup;
+function drawDrizzle(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string): void {
+  ctx.strokeStyle = color;
   ctx.lineWidth = 4;
   ctx.beginPath();
   for (let i = 0; i <= 6; i++) {
@@ -287,12 +290,14 @@ function drawPlateContents(ctx: CanvasRenderingContext2D, plate: Plate, r: Rect)
   if (plate.sausage) {
     drawSprite(ctx, 'sausageCooked', cx - 46, cy - 2, 92, 34);
     if (plate.onion) drawSprite(ctx, 'onionCooked', cx - 30, cy - 8, 60, 18);
-    if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy);
+    if (plate.ketchup) drawDrizzle(ctx, cx, cy, PALETTE.ketchup);
+    if (plate.mustard) drawDrizzle(ctx, cx, cy + 6, PALETTE.mustard);
   }
   if (plate.patty) {
     drawSprite(ctx, 'pattyCooked', cx - 44, cy - 2, 88, 30);
     if (plate.onion) drawSprite(ctx, 'onionCooked', cx - 30, cy - 10, 60, 18);
-    if (plate.ketchup) drawKetchupZigzag(ctx, cx, cy - 4);
+    if (plate.ketchup) drawDrizzle(ctx, cx, cy - 4, PALETTE.ketchup);
+    if (plate.mustard) drawDrizzle(ctx, cx, cy + 2, PALETTE.mustard);
   }
   if (plate.fries) drawSprite(ctx, 'friesCooked', r.x + 6, r.y + 6, 40, 40);
   if (plate.drink) drawDrinkIcon(ctx, r.x + r.w - 24, r.y + 14);
@@ -506,7 +511,9 @@ function drawDragGhost(ctx: CanvasRenderingContext2D, state: GameState, drag: Dr
   } else if (drag.kind === 'onion' || drag.kind === 'rawOnion') {
     drawSprite(ctx, drag.kind === 'rawOnion' ? 'onionRaw' : 'onionCooked', x - 30, y - 20, 60, 40);
   } else if (drag.kind === 'ketchup') {
-    drawKetchupIcon(ctx, x, y - 14);
+    drawBottleIcon(ctx, x, y - 14, PALETTE.ketchup, '#7a1d13');
+  } else if (drag.kind === 'mustard') {
+    drawBottleIcon(ctx, x, y - 14, PALETTE.mustard, '#8a6606');
   } else if (drag.kind === 'drink') {
     drawDrinkIcon(ctx, x, y - 16);
   } else if (drag.kind === 'plate' && drag.slot != null) {

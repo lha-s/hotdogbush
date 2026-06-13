@@ -71,6 +71,8 @@ export const PAYOUT = {
   burgerBun: 10,
   ketchup: 3,
   ketchupMiss: 2, // penalty when the order wanted ketchup and didn't get it
+  mustard: 3,
+  mustardMiss: 2,
   drink: 7,
   friesPerfect: 8, // fries value by doneness
   friesGood: 5,

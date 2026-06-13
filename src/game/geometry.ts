@@ -50,7 +50,8 @@ export function panSlotRect(slot: number): Rect {
 
 // ---- stations: condiments + trash + raw sources ----
 export const STATION_RECTS: Record<Station, Rect> = {
-  ketchup: { x: 10, y: 150, w: 128, h: 64 },
+  ketchup: { x: 10, y: 150, w: 62, h: 64 },
+  mustard: { x: 76, y: 150, w: 62, h: 64 },
   trash: { x: 10, y: 222, w: 128, h: 64 },
   drink: { x: 10, y: 286, w: 128, h: 62 }, // left column, above the fryer
   bun: { x: 284, y: 150, w: 118, h: 66 }, // hot-dog bun source (centre)

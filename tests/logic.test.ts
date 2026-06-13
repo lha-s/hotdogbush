@@ -6,6 +6,7 @@ import {
   dropCookedOnPlate,
   dropDrink,
   dropKetchup,
+  dropMustard,
   generateOrder,
   gradeOf,
   isBurnt,
@@ -317,6 +318,30 @@ describe('fries (fryer) + onions (pan)', () => {
   test('fries only appear in orders after their unlock time', () => {
     for (let i = 0; i < 20; i++) expect(generateOrder(() => i / 20, UNLOCK.fries - 1).fries).toBe(false);
     expect(generateOrder(() => 0, UNLOCK.fries).fries).toBe(true);
+  });
+});
+
+describe('mustard (second condiment)', () => {
+  test('mustard needs a protein and modifies pay like ketchup', () => {
+    const s = playing();
+    placeBun(s);
+    expect(dropMustard(s, 0)).toBe(false); // bun only, no protein
+    startCooking(s, 0, 'sausage');
+    s.dogs[0].cook = 10;
+    dropCookedOnPlate(s, s.dogs[0].id, 0);
+    expect(dropMustard(s, 0)).toBe(true);
+    expect(s.plates[0]?.mustard).toBe(true);
+    expect(dropMustard(s, 0)).toBe(false); // already mustarded
+  });
+  test('payout: +mustard when present, -mustardMiss when wanted but missing', () => {
+    const withM = platePayout(plate({ bun: true, sausage: 'perfect', mustard: true }), order({ sausage: true, mustard: true }), 0);
+    expect(withM).toBe(PAYOUT.bun + PAYOUT.perfect + PAYOUT.mustard);
+    const without = platePayout(plate({ bun: true, sausage: 'perfect' }), order({ sausage: true, mustard: true }), 0);
+    expect(without).toBe(PAYOUT.bun + PAYOUT.perfect - PAYOUT.mustardMiss);
+  });
+  test('mustard only appears in orders after its unlock time', () => {
+    for (let i = 0; i < 20; i++) expect(generateOrder(() => i / 20, UNLOCK.mustard - 1).mustard).toBe(false);
+    expect(generateOrder(() => 0, UNLOCK.mustard).mustard).toBe(true);
   });
 });
 

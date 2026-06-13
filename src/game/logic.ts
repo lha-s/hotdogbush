@@ -96,6 +96,7 @@ export function platePayout(plate: Plate, order: Order, combo: number): number {
   if (plate.patty) pay += PAYOUT.burgerBun + gradePay(plate.patty);
   if (plate.fries) pay += friesPay(plate.fries);
   if (order.ketchup) pay += plate.ketchup ? PAYOUT.ketchup : -PAYOUT.ketchupMiss;
+  if (order.mustard) pay += plate.mustard ? PAYOUT.mustard : -PAYOUT.mustardMiss;
   if (order.onion) pay += plate.onion ? PAYOUT.onion : -PAYOUT.onionMiss;
   if (plate.drink) pay += PAYOUT.drink;
   pay += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
@@ -117,8 +118,8 @@ export function generateOrder(rng: () => number = Math.random, elapsed = Infinit
     sausage: !useBurger,
     burger: useBurger,
     ketchup: rng() < 0.4,
+    mustard: elapsed >= UNLOCK.mustard && rng() < 0.3,
     onion: elapsed >= UNLOCK.onion && useBurger && rng() < 0.4, // onions ride on burgers
-    mustard: false, // unlocked in a later phase
     drink: rng() < 0.4,
     fries: elapsed >= UNLOCK.fries && rng() < 0.45,
   };
@@ -249,6 +250,17 @@ export function dropKetchup(state: GameState, plateSlot: number): boolean {
   const plate = state.plates[plateSlot];
   if (plate && (plate.sausage !== null || plate.patty !== null) && !plate.ketchup) {
     plate.ketchup = true;
+    return true;
+  }
+  return false;
+}
+
+/** Drag the mustard bottle onto a protein. */
+export function dropMustard(state: GameState, plateSlot: number): boolean {
+  if (state.phase !== 'playing') return false;
+  const plate = state.plates[plateSlot];
+  if (plate && (plate.sausage !== null || plate.patty !== null) && !plate.mustard) {
+    plate.mustard = true;
     return true;
   }
   return false;

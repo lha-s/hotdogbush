@@ -6,6 +6,7 @@ import {
   dropCookedOnPlate,
   dropDrink,
   dropKetchup,
+  dropMustard,
   placeBun,
   placeBurgerBun,
   isBurntItem,
@@ -153,6 +154,7 @@ export class Engine {
     }
     if (t.kind === 'station') {
       if (t.station === 'ketchup') return { kind: 'ketchup', x, y };
+      if (t.station === 'mustard') return { kind: 'mustard', x, y };
       if (t.station === 'drink') return { kind: 'drink', x, y };
       if (t.station === 'rawPatty') return { kind: 'rawPatty', x, y };
       if (t.station === 'rawPotato') return { kind: 'rawPotato', x, y };
@@ -219,6 +221,8 @@ export class Engine {
       }
     } else if (drag.kind === 'ketchup' && t?.kind === 'table') {
       if (dropKetchup(this.state, t.slot)) this.pushFx(x, y, '+ ketchup', PALETTE.ketchup);
+    } else if (drag.kind === 'mustard' && t?.kind === 'table') {
+      if (dropMustard(this.state, t.slot)) this.pushFx(x, y, '+ mustard', PALETTE.mustard);
     } else if (drag.kind === 'drink' && t?.kind === 'table') {
       if (dropDrink(this.state, t.slot)) this.pushFx(x, y, '+ drink', PALETTE.drink);
     }

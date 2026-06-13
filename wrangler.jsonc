@@ -1,0 +1,23 @@
+{
+  // Cloudflare Workers Static Assets deployment.
+  // HotDogBush is a static SPA; all backend logic lives in Supabase (Postgres + Realtime +
+  // the submit-score Edge Function), so no Worker script is needed — assets-only.
+  // Docs: https://developers.cloudflare.com/workers/static-assets/
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "hotdogbush",
+  "compatibility_date": "2026-06-13",
+  "assets": {
+    "directory": "./dist",
+    // Single index.html SPA; unknown paths fall back to it.
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Non-secret display config. The Supabase URL + anon (publishable) key are PUBLIC by design
+    // and are baked into the client bundle at build time via Vite (VITE_* env). For production,
+    // set those VITE_* values in the build environment / CI, not here.
+    "TOKEN_TICKER": "HOTDOG"
+  }
+}

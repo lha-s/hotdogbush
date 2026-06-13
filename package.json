@@ -1,0 +1,31 @@
+{
+  "name": "hotdogbush",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HotDogBush ($HOTDOG) — a pump.fun arcade game. Cook hot dogs, climb the realtime leaderboard, win a share of the trading tax.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > src/types/db.ts",
+    "fn:serve": "supabase functions serve submit-score --no-verify-jwt",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.0.0"
+  }
+}

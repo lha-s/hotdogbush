@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>HotDogBush · $HOTDOG — cook, climb, cash out</title>
+    <meta
+      name="description"
+      content="HotDogBush ($HOTDOG): a pump.fun arcade game. Cook hot dogs, top the live leaderboard, and win a share of the trading tax every 4 hours."
+    />
+    <meta property="og:title" content="HotDogBush · $HOTDOG" />
+    <meta property="og:description" content="Cook hot dogs. Climb the realtime leaderboard. Win a cut of the tax." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand__logo" aria-hidden="true">🌭</span>
+          <span class="brand__name">HOTDOG<span class="brand__bush">BUSH</span></span>
+          <span class="brand__ticker">$HOTDOG</span>
+        </div>
+        <nav class="topbar__links" aria-label="Primary">
+          <a id="pumpLink" class="btn btn--pump" href="#" target="_blank" rel="noopener noreferrer">Buy on pump.fun</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="stage" aria-labelledby="game-heading">
+          <h1 id="game-heading" class="sr-only">HotDogBush — cooking game</h1>
+          <div class="stage__round">
+            <span class="round__label">Round ends in</span>
+            <span id="roundTimer" class="round__timer" aria-live="polite">--:--:--</span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="game" width="800" height="500" aria-label="Hot dog cooking game board"></canvas>
+            <div id="overlay" class="overlay" data-state="start">
+              <!-- populated by the game engine (start / paused / game over) -->
+            </div>
+          </div>
+          <div class="hud" id="hud" hidden>
+            <div class="hud__stat"><span class="hud__k">Cash</span><span id="hudCash" class="hud__v">$0</span></div>
+            <div class="hud__stat"><span class="hud__k">Served</span><span id="hudServed" class="hud__v">0</span></div>
+            <div class="hud__stat"><span class="hud__k">Lives</span><span id="hudLives" class="hud__v">❤❤❤</span></div>
+          </div>
+        </section>
+
+        <section class="board" aria-labelledby="lb-heading">
+          <div class="board__head">
+            <h2 id="lb-heading">Leaderboard</h2>
+            <p class="board__sub">
+              Top earners this 4-hour round split <strong>50% of the trading tax</strong>.
+              Live <span id="lbStatus" class="dot dot--off" title="realtime status"></span>
+            </p>
+          </div>
+          <ol id="leaderboard" class="lb-list" aria-live="polite">
+            <li class="lb-empty">Be the first to cook. Your name goes here.</li>
+          </ol>
+          <p class="board__foot">
+            Prizes: 🥇 25% · 🥈 12% · 🥉 7% · 4th 4% · 5th 2% of tax pool. <a href="#how">How it works</a>
+          </p>
+        </section>
+
+        <section id="how" class="explain" aria-labelledby="how-heading">
+          <h2 id="how-heading">How HotDogBush works</h2>
+          <ol class="explain__steps">
+            <li><strong>Cook & serve.</strong> Grill dogs to the right doneness, dress them, serve before customers walk. Every served dog is cash.</li>
+            <li><strong>Climb the board.</strong> Your cash this round is your score. The leaderboard updates live for everyone.</li>
+            <li><strong>Round resets every 4 hours.</strong> Fresh competition, fresh pot.</li>
+            <li><strong>Top 5 split the pot.</strong> 50% of $HOTDOG trading tax is distributed to the round's top earners.</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>HotDogBush is a game. $HOTDOG is a memecoin. Play for fun, not financial advice.</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

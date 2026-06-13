@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.DS_Store
+
+# env / secrets
+.env
+.env.*
+!.env.example
+supabase/functions/.env
+
+# supabase local
+supabase/.branches
+supabase/.temp
+
+# build caches
+*.tsbuildinfo
+.wrangler/
+
+# claude-flow scratch
+.claude-flow/

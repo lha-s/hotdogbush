@@ -12,43 +12,63 @@ export const SHIFT = {
 
 export const GRILL = {
   slots: 3, // original grill has 3 sausage positions
-  slotW: 180,
+  slotW: 132,
   slotH: 74,
-  y: 380, // top of grill row
-  gap: 20,
+  y: 250, // top of grill row
+  gap: 16,
 } as const;
 
 export const CUSTOMER = {
   max: 4,
-  slotW: 170,
-  slotH: 120,
-  y: 30,
+  slotW: 172,
+  slotH: 116,
+  y: 14,
   gap: 12,
 } as const;
 
 // Cooking is measured in SECONDS of grill time and matches the original's doneness steps:
-//   0–7s  = underdone  (servable, lower pay)
-//   7–14s = perfect    (best pay)
-//   >=14s = overdone   (still servable, low pay) — you never "ruin" a dog, you just earn less.
+//   0–7s   = underdone (servable, lower pay)
+//   7–14s  = perfect   (best pay)
+//   14–21s = overdone  (servable, low pay)
+//   >=21s  = burnt     (worthless — must be thrown in the trash to free the slot)
 export const COOK = {
   perfectFrom: 7, // s — reaches perfect doneness (original advances state every 7s)
   overdoneFrom: 14, // s — slips to overdone
-  meterMax: 21, // s — visual ceiling for the cook meter
+  burntFrom: 21, // s — ruined; can only be trashed
+  meterMax: 24, // s — visual ceiling for the cook meter
 } as const;
 
-// Payouts mirror the original sausage values: underdone 6, perfect 10, overdone 5.
+// Sausage values mirror the original (underdone 6, perfect 10, overdone 5). Ketchup and a
+// drink each add to the ticket total; a drink-only order pays just the drink value.
 export const PAYOUT = {
   perfect: 10,
   good: 6, // underdone but servable
   overdone: 5,
+  ketchup: 2,
+  drink: 4,
   comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
   comboMax: 5,
 } as const;
 
 export const RULES = {
   spawnInterval: 8, // s — constant, matches original timerCustomers.Interval = 8000ms
-  patience: 12, // s — not specified in the original source; tuned so customers queue sensibly
+  patience: 13, // s — not specified in the original source; tuned so customers queue sensibly
 } as const;
+
+// Cash that appears after a serve lingers on the counter, then vanishes (original moneyTimer = 2.5s).
+export const CASH = {
+  life: 3.5, // s — a touch longer than the original so it's tappable on mobile
+  radius: 28, // px — tap target for collecting a cash token
+} as const;
+
+// The five order combinations from the original OrderList (Sausage / Ketchup / Glass).
+export const ORDER_COMBOS: ReadonlyArray<{ sausage: boolean; ketchup: boolean; drink: boolean }> = [
+  { sausage: true, ketchup: true, drink: false }, // dog + ketchup
+  { sausage: true, ketchup: false, drink: false }, // plain dog
+  { sausage: true, ketchup: true, drink: true }, // dog + ketchup + drink
+  { sausage: true, ketchup: false, drink: true }, // dog + drink
+  { sausage: false, ketchup: false, drink: true }, // drink only
+];
 
 export const PALETTE = {
   grillCold: '#2a2a2e',
@@ -67,6 +87,13 @@ export const PALETTE = {
   customerBody: '#3a2c22',
   patienceGood: '#5fa83a',
   patienceLow: '#e23a28',
+  ketchup: '#e23a28',
+  mustard: '#f4b400',
+  drink: '#7fc8e0',
+  plate: '#cfd6dd',
+  station: '#2a201a',
+  stationActive: '#473527',
+  cash: '#5fd07a',
 } as const;
 
 // Plausibility ceiling used client-side and re-checked server-side (anti-cheat sanity bound).

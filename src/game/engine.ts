@@ -1,18 +1,29 @@
 import { PALETTE } from './constants.ts';
-import { grillSlotAt, grillSlotRect } from './geometry.ts';
-import { createState, serveFromSlot, startCooking, startGame, step } from './logic.ts';
+import { STATION_RECTS, customerSlotRect, grillSlotRect, targetAt } from './geometry.ts';
+import type { Rect } from './geometry.ts';
+import {
+  collectToken,
+  createState,
+  serveCustomer,
+  startGame,
+  step,
+  tapGrill,
+  tokenAt,
+  useStation,
+} from './logic.ts';
 import { render } from './render.ts';
-import type { GameState, Grade, ServeFx } from './types.ts';
+import type { GameState, ServeFx, Station } from './types.ts';
 
 export interface EngineHooks {
   onHud(state: GameState): void;
   onGameOver(finalCash: number, served: number): void;
 }
 
-const GRADE_FX: Record<Grade, { text: string; color: string }> = {
-  perfect: { text: 'PERFECT +', color: PALETTE.meterPerfect },
-  good: { text: 'OK +', color: PALETTE.meterRaw },
-  overdone: { text: 'OVERDONE +', color: PALETTE.meterBurnt },
+const STATION_LABEL: Record<Station, string> = {
+  bun: '+ bun',
+  ketchup: '+ ketchup',
+  drink: '+ drink',
+  trash: 'trashed',
 };
 
 export class Engine {
@@ -23,7 +34,10 @@ export class Engine {
   private last = 0;
   private hooks: EngineHooks;
 
-  constructor(private canvas: HTMLCanvasElement, hooks: EngineHooks) {
+  constructor(
+    private canvas: HTMLCanvasElement,
+    hooks: EngineHooks,
+  ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas context unavailable');
     this.ctx = ctx;
@@ -49,29 +63,46 @@ export class Engine {
     return { x, y };
   }
 
+  private fxAt(r: Rect, text: string, color: string): void {
+    this.fx.push({ x: r.x + r.w / 2, y: r.y - 4, text, color, life: 1 });
+  }
+
   private onPointer = (ev: PointerEvent): void => {
     if (this.state.phase !== 'playing') return;
     ev.preventDefault();
     const { x, y } = this.toBoard(ev);
-    const slot = grillSlotAt(x, y);
-    if (slot === -1) return;
 
-    const hasDog = this.state.dogs.some((d) => d.slot === slot);
-    if (!hasDog) {
-      startCooking(this.state, slot);
-    } else {
-      const result = serveFromSlot(this.state, slot);
-      if (result) this.spawnFx(slot, result.grade, result.cash);
+    // 1) cash tokens (drawn on top, collected first)
+    const token = tokenAt(this.state, x, y);
+    if (token) {
+      const amt = collectToken(this.state, token.id);
+      this.fx.push({ x: token.x, y: token.y, text: `+$${amt}`, color: PALETTE.cash, life: 1.1 });
+      this.hooks.onHud(this.state);
+      return;
     }
+
+    const target = targetAt(x, y);
+    if (!target) return;
+
+    if (target.kind === 'grill') {
+      const res = tapGrill(this.state, target.slot);
+      const r = grillSlotRect(target.slot);
+      if (res === 'tossed') this.fxAt(r, 'trashed', PALETTE.meterBurnt);
+      else if (res === 'plated') this.fxAt(r, '+ dog', PALETTE.meterPerfect);
+      else if (res === 'need-bun') this.fxAt(r, 'grab a bun!', PALETTE.meterRaw);
+    } else if (target.kind === 'customer') {
+      const res = serveCustomer(this.state, target.slot);
+      const r = customerSlotRect(target.slot);
+      if (res.reason === 'served') this.fxAt(r, `ORDER UP! +$${res.payout}`, PALETTE.cash);
+      else if (res.reason === 'wrong-order') this.fxAt(r, 'WRONG ORDER', PALETTE.meterBurnt);
+      else if (res.reason === 'empty-plate') this.fxAt(r, 'build it first', PALETTE.meterRaw);
+    } else if (target.kind === 'station') {
+      const res = useStation(this.state, target.station);
+      if (res === 'ok') this.fxAt(STATION_RECTS[target.station], STATION_LABEL[target.station], PALETTE.text);
+    }
+
     this.hooks.onHud(this.state);
   };
-
-  private spawnFx(slot: number, grade: Grade, cash: number): void {
-    const r = grillSlotRect(slot);
-    const meta = GRADE_FX[grade];
-    const text = cash > 0 ? `${meta.text}$${cash}` : meta.text;
-    this.fx.push({ x: r.x + r.w / 2, y: r.y - 6, text, color: meta.color, life: 1 });
-  }
 
   loop = (ts: number): void => {
     if (!this.last) this.last = ts;
@@ -87,10 +118,9 @@ export class Engine {
       }
     }
 
-    // advance fx
     for (const f of this.fx) {
-      f.life -= dt * 1.4;
-      f.y -= dt * 30;
+      f.life -= dt * 1.3;
+      f.y -= dt * 26;
     }
     this.fx = this.fx.filter((f) => f.life > 0);
 
@@ -99,7 +129,7 @@ export class Engine {
   };
 
   private render(): void {
-    render(this.ctx, this.state, this.fx, this.state.combo);
+    render(this.ctx, this.state, this.fx);
   }
 
   run(): void {

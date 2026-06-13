@@ -11,9 +11,8 @@ export interface EngineHooks {
 
 const GRADE_FX: Record<Grade, { text: string; color: string }> = {
   perfect: { text: 'PERFECT +', color: PALETTE.meterPerfect },
-  good: { text: 'NICE +', color: PALETTE.meterRaw },
-  edge: { text: 'OK +', color: PALETTE.muted },
-  reject: { text: 'WASTED', color: PALETTE.meterBurnt },
+  good: { text: 'OK +', color: PALETTE.meterRaw },
+  overdone: { text: 'OVERDONE +', color: PALETTE.meterBurnt },
 };
 
 export class Engine {

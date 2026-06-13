@@ -5,12 +5,17 @@ export const BOARD = {
   height: 500,
 } as const;
 
+// A play session is a fixed 90-second shift (matches the original Hot Dog Bush).
+export const SHIFT = {
+  duration: 90, // seconds
+} as const;
+
 export const GRILL = {
-  slots: 4,
-  slotW: 150,
-  slotH: 70,
+  slots: 3, // original grill has 3 sausage positions
+  slotW: 180,
+  slotH: 74,
   y: 380, // top of grill row
-  gap: 16,
+  gap: 20,
 } as const;
 
 export const CUSTOMER = {
@@ -21,35 +26,28 @@ export const CUSTOMER = {
   gap: 12,
 } as const;
 
-// Cooking: a dog's `cook` goes 0 -> 1 over COOK_TIME, then keeps rising into "burnt".
+// Cooking is measured in SECONDS of grill time and matches the original's doneness steps:
+//   0–7s  = underdone  (servable, lower pay)
+//   7–14s = perfect    (best pay)
+//   >=14s = overdone   (still servable, low pay) — you never "ruin" a dog, you just earn less.
 export const COOK = {
-  // seconds of cooking to traverse the full raw->burnt range
-  fullTime: 4.5,
-  // doneness bands (fraction of fullTime)
-  rawUntil: 0.42, // < this = undercooked (rejected)
-  perfectFrom: 0.42,
-  perfectTo: 0.72, // green zone
-  goodTo: 0.86, // acceptable but lower pay
-  // > goodTo and still rising = burnt (rejected, occupies slot until cleared)
-  burntAt: 0.92,
+  perfectFrom: 7, // s — reaches perfect doneness (original advances state every 7s)
+  overdoneFrom: 14, // s — slips to overdone
+  meterMax: 21, // s — visual ceiling for the cook meter
 } as const;
 
+// Payouts mirror the original sausage values: underdone 6, perfect 10, overdone 5.
 export const PAYOUT = {
-  perfect: 8,
-  good: 5,
-  edge: 2,
-  comboStep: 1, // extra cash per combo level
+  perfect: 10,
+  good: 6, // underdone but servable
+  overdone: 5,
+  comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
   comboMax: 5,
 } as const;
 
 export const RULES = {
-  startLives: 3,
-  // spawn cadence ramps with elapsed time
-  spawnStart: 3.2, // seconds between customers at t=0
-  spawnMin: 1.1,
-  spawnRampPer: 22, // each N seconds, spawn interval tightens
-  patienceStart: 11, // seconds a customer waits
-  patienceMin: 5.5,
+  spawnInterval: 8, // s — constant, matches original timerCustomers.Interval = 8000ms
+  patience: 12, // s — not specified in the original source; tuned so customers queue sensibly
 } as const;
 
 export const PALETTE = {

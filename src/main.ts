@@ -24,7 +24,7 @@ const overlay = $('#overlay');
 const hud = $('#hud');
 const hudCash = $('#hudCash');
 const hudServed = $('#hudServed');
-const hudLives = $('#hudLives');
+const hudTime = $('#hudTime');
 const roundTimer = $('#roundTimer');
 
 // remember the player's name across runs
@@ -74,7 +74,8 @@ tickRoundTimer();
 function paintHud(state: GameState): void {
   hudCash.textContent = `$${state.cash.toLocaleString()}`;
   hudServed.textContent = String(state.served);
-  hudLives.textContent = '❤'.repeat(Math.max(0, state.lives)) || '—';
+  const s = Math.ceil(state.timeLeft);
+  hudTime.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 // --- engine ---
@@ -91,9 +92,9 @@ function showStart(): void {
   hud.hidden = true;
   overlay.innerHTML = `
     <h2>HotDogBush 🌭</h2>
-    <p>Tap a grill slot to cook. Tap a cooking dog to serve the waiting customer — but watch the meter: undercooked or burnt gets tossed. Don't let customers walk.</p>
-    <button class="btn btn--play" id="playBtn">Start cooking</button>
-    <p style="font-size:0.8rem;color:var(--color-muted)">Your cash is your score on the $${ticker} leaderboard.</p>
+    <p>You've got <strong>90 seconds</strong>. Tap a grill slot to cook, tap a cooking dog to serve a waiting customer. Hit the <strong>green zone</strong> (~7–14s) for top dollar — overdone still sells, just for less. Don't let customers walk.</p>
+    <button class="btn btn--play" id="playBtn">Start the shift</button>
+    <p style="font-size:0.8rem;color:var(--color-muted)">Cash earned this shift is your score on the $${ticker} leaderboard.</p>
   `;
   $('#playBtn').addEventListener('click', beginRun, { once: true });
 }

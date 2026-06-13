@@ -1,77 +1,76 @@
 import { describe, expect, test } from 'vitest';
-import { COOK, PAYOUT, RULES } from '../src/game/constants.ts';
+import { COOK, PAYOUT, RULES, SHIFT } from '../src/game/constants.ts';
 import {
   createState,
   gradeOf,
   payoutFor,
   serveFromSlot,
-  spawnInterval,
   startCooking,
   startGame,
   step,
 } from '../src/game/logic.ts';
+import type { Customer } from '../src/game/types.ts';
 
-describe('gradeOf', () => {
-  test('undercooked is rejected', () => {
-    expect(gradeOf(COOK.rawUntil - 0.01)).toBe('reject');
+const waitingCustomer = (slot = 0): Customer => ({
+  id: 1,
+  slot,
+  patience: 5,
+  patienceMax: 5,
+  served: false,
+  leaving: false,
+});
+
+describe('gradeOf (seconds-based, matches original 7s/14s steps)', () => {
+  test('under 7s is underdone ("good")', () => {
+    expect(gradeOf(0)).toBe('good');
+    expect(gradeOf(COOK.perfectFrom - 0.1)).toBe('good');
   });
-  test('green zone is perfect', () => {
-    expect(gradeOf((COOK.perfectFrom + COOK.perfectTo) / 2)).toBe('perfect');
+  test('7–14s is perfect', () => {
+    expect(gradeOf(COOK.perfectFrom)).toBe('perfect');
+    expect(gradeOf(COOK.overdoneFrom - 0.1)).toBe('perfect');
   });
-  test('slightly past perfect is good', () => {
-    expect(gradeOf((COOK.perfectTo + COOK.goodTo) / 2)).toBe('good');
-  });
-  test('burnt is rejected', () => {
-    expect(gradeOf(COOK.burntAt + 0.05)).toBe('reject');
+  test('14s+ is overdone', () => {
+    expect(gradeOf(COOK.overdoneFrom)).toBe('overdone');
+    expect(gradeOf(60)).toBe('overdone');
   });
 });
 
-describe('payoutFor', () => {
-  test('reject pays nothing regardless of combo', () => {
-    expect(payoutFor('reject', 10)).toBe(0);
+describe('payoutFor (every serve pays; original values 6 / 10 / 5)', () => {
+  test('base values match the original sausage worth', () => {
+    expect(payoutFor('good', 0)).toBe(PAYOUT.good); // 6
+    expect(payoutFor('perfect', 0)).toBe(PAYOUT.perfect); // 10
+    expect(payoutFor('overdone', 0)).toBe(PAYOUT.overdone); // 5
   });
-  test('perfect pays base plus combo bonus, capped', () => {
-    expect(payoutFor('perfect', 0)).toBe(PAYOUT.perfect);
+  test('combo adds a capped bonus', () => {
     expect(payoutFor('perfect', 3)).toBe(PAYOUT.perfect + 3 * PAYOUT.comboStep);
     expect(payoutFor('perfect', 999)).toBe(PAYOUT.perfect + PAYOUT.comboMax * PAYOUT.comboStep);
   });
 });
 
-describe('spawnInterval', () => {
-  test('starts slow and ramps down to the floor', () => {
-    expect(spawnInterval(0)).toBeCloseTo(RULES.spawnStart);
-    expect(spawnInterval(10_000)).toBe(RULES.spawnMin);
-  });
-});
-
 describe('startCooking', () => {
-  test('places a dog on an empty slot while playing', () => {
+  test('places a dog with zero cook time while playing', () => {
     const s = createState();
     startGame(s);
     expect(startCooking(s, 0)).toBe(true);
-    expect(s.dogs).toHaveLength(1);
+    expect(s.dogs[0].cook).toBe(0);
   });
-  test('refuses an occupied slot', () => {
+  test('refuses an occupied slot and refuses when not playing', () => {
     const s = createState();
     startGame(s);
     startCooking(s, 0);
     expect(startCooking(s, 0)).toBe(false);
-    expect(s.dogs).toHaveLength(1);
-  });
-  test('refuses when not playing', () => {
-    const s = createState(); // phase 'start'
-    expect(startCooking(s, 0)).toBe(false);
+    const fresh = createState();
+    expect(startCooking(fresh, 0)).toBe(false);
   });
 });
 
-describe('serveFromSlot', () => {
-  test('serving a perfect dog to a waiting customer pays and increments combo', () => {
+describe('serveFromSlot (no failure state — always sells)', () => {
+  test('perfect dog to a waiting customer pays 10 and bumps combo', () => {
     const s = createState();
     startGame(s);
     startCooking(s, 0);
-    s.dogs[0].cook = (COOK.perfectFrom + COOK.perfectTo) / 2; // perfect
-    s.customers.push({ id: 1, slot: 0, patience: 5, patienceMax: 5, served: false, leaving: false });
-
+    s.dogs[0].cook = 10; // perfect (7–14s)
+    s.customers.push(waitingCustomer());
     const res = serveFromSlot(s, 0);
     expect(res?.grade).toBe('perfect');
     expect(s.cash).toBe(PAYOUT.perfect);
@@ -80,69 +79,73 @@ describe('serveFromSlot', () => {
     expect(s.dogs).toHaveLength(0);
   });
 
-  test('serving an undercooked dog wastes it and breaks combo', () => {
+  test('underdone dog still sells for the lower value', () => {
     const s = createState();
     startGame(s);
-    s.combo = 4;
     startCooking(s, 1);
-    s.dogs[0].cook = 0.01; // raw
-    s.customers.push({ id: 1, slot: 0, patience: 5, patienceMax: 5, served: false, leaving: false });
-
+    s.dogs[0].cook = 3; // underdone
+    s.customers.push(waitingCustomer());
     const res = serveFromSlot(s, 1);
-    expect(res?.grade).toBe('reject');
-    expect(s.cash).toBe(0);
-    expect(s.combo).toBe(0);
-    expect(s.dogs).toHaveLength(0);
+    expect(res?.grade).toBe('good');
+    expect(s.cash).toBe(PAYOUT.good);
   });
 
-  test('tossing a burnt dog clears the slot with no customer needed', () => {
+  test('overdone dog still sells for the lowest value', () => {
     const s = createState();
     startGame(s);
     startCooking(s, 2);
-    s.dogs[0].state = 'burnt';
+    s.dogs[0].cook = 20; // overdone
+    s.customers.push(waitingCustomer());
     const res = serveFromSlot(s, 2);
-    expect(res?.grade).toBe('reject');
-    expect(s.dogs).toHaveLength(0);
+    expect(res?.grade).toBe('overdone');
+    expect(s.cash).toBe(PAYOUT.overdone);
   });
 
-  test('does nothing if no customer is waiting for a good dog', () => {
+  test('does nothing when no customer is waiting', () => {
     const s = createState();
     startGame(s);
     startCooking(s, 0);
-    s.dogs[0].cook = (COOK.perfectFrom + COOK.perfectTo) / 2;
-    const res = serveFromSlot(s, 0);
-    expect(res).toBeNull();
-    expect(s.dogs).toHaveLength(1); // dog stays on the grill
+    s.dogs[0].cook = 10;
+    expect(serveFromSlot(s, 0)).toBeNull();
+    expect(s.dogs).toHaveLength(1);
   });
 });
 
-describe('step', () => {
-  test('cooks dogs over time and burns them past the threshold', () => {
+describe('step (90-second shift)', () => {
+  test('cooking accrues in real seconds', () => {
     const s = createState();
     startGame(s);
     startCooking(s, 0);
-    step(s, COOK.fullTime * COOK.burntAt + 0.1);
-    expect(s.dogs[0].state).toBe('burnt');
+    step(s, 8);
+    expect(s.dogs[0].cook).toBeCloseTo(8);
+    expect(gradeOf(s.dogs[0].cook)).toBe('perfect');
   });
 
-  test('a customer whose patience expires costs a life and breaks combo', () => {
+  test('the shift clock counts down and ends the game at zero', () => {
     const s = createState();
     startGame(s);
-    s.combo = 3;
+    expect(s.timeLeft).toBe(SHIFT.duration);
+    step(s, SHIFT.duration + 1);
+    expect(s.timeLeft).toBe(0);
+    expect(s.phase).toBe('gameover');
+  });
+
+  test('a customer who runs out of patience is counted missed and breaks combo', () => {
+    const s = createState();
+    startGame(s);
+    s.combo = 4;
     s.customers.push({ id: 1, slot: 0, patience: 0.5, patienceMax: 5, served: false, leaving: false });
-    const before = s.lives;
-    const { lostLife } = step(s, 1);
-    expect(lostLife).toBe(true);
-    expect(s.lives).toBe(before - 1);
+    const { missed } = step(s, 1);
+    expect(missed).toBe(true);
+    expect(s.missed).toBe(1);
     expect(s.combo).toBe(0);
   });
 
-  test('game ends when lives reach zero', () => {
+  test('customers spawn on the constant 8s cadence', () => {
     const s = createState();
     startGame(s);
-    s.lives = 1;
-    s.customers.push({ id: 1, slot: 0, patience: 0.1, patienceMax: 5, served: false, leaving: false });
-    step(s, 1);
-    expect(s.phase).toBe('gameover');
+    s.spawnTimer = RULES.spawnInterval;
+    step(s, RULES.spawnInterval + 0.1);
+    expect(s.customers.length).toBeGreaterThanOrEqual(1);
   });
 });

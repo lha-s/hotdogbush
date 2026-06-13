@@ -1,12 +1,9 @@
 export type GamePhase = 'start' | 'playing' | 'gameover';
 
-export type DogState = 'cooking' | 'burnt';
-
 export interface Dog {
   id: number;
   slot: number;
-  cook: number; // 0..~1.1, fraction of COOK.fullTime traversed
-  state: DogState;
+  cook: number; // seconds of grill time elapsed
 }
 
 export interface Customer {
@@ -21,9 +18,10 @@ export interface Customer {
 export interface GameState {
   phase: GamePhase;
   elapsed: number;
+  timeLeft: number; // seconds left in the 90s shift
   cash: number;
   served: number;
-  lives: number;
+  missed: number; // customers who walked off
   combo: number;
   dogs: Dog[];
   customers: Customer[];
@@ -32,7 +30,7 @@ export interface GameState {
   spawnTimer: number;
 }
 
-export type Grade = 'perfect' | 'good' | 'edge' | 'reject';
+export type Grade = 'perfect' | 'good' | 'overdone';
 
 export interface ServeFx {
   x: number;

@@ -20,8 +20,8 @@ function drawSprite(ctx: CanvasRenderingContext2D, key: SpriteKey, x: number, y:
 }
 
 function sausageKeyFor(dog: Dog): SpriteKey {
-  if (dog.state === 'burnt') return 'sausageBurnt';
-  return dog.cook < COOK.rawUntil ? 'sausageRaw' : 'sausageCooked';
+  if (dog.cook >= COOK.overdoneFrom) return 'sausageBurnt';
+  return dog.cook < COOK.perfectFrom ? 'sausageRaw' : 'sausageCooked';
 }
 
 function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -58,11 +58,9 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
 }
 
 function dogColor(dog: Dog): string {
-  if (dog.state === 'burnt') return PALETTE.burnt;
-  const t = dog.cook / 1;
-  if (t < COOK.rawUntil) return PALETTE.raw;
-  if (t <= COOK.goodTo) return PALETTE.perfect;
-  return '#3a2418';
+  if (dog.cook < COOK.perfectFrom) return PALETTE.raw;
+  if (dog.cook < COOK.overdoneFrom) return PALETTE.perfect;
+  return PALETTE.burnt;
 }
 
 function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
@@ -82,16 +80,7 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
     ctx.fill();
   }
 
-  if (dog.state === 'burnt') {
-    ctx.fillStyle = PALETTE.ember;
-    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🔥 burnt — tap to toss', cx, r.y + r.h - 12);
-    return;
-  }
-
-  // cook meter
+  // cook meter (seconds), with the 7–14s "perfect" zone highlighted in green
   const meterW = r.w - 24;
   const mx = r.x + 12;
   const my = r.y + r.h - 14;
@@ -99,18 +88,25 @@ function drawDog(ctx: CanvasRenderingContext2D, dog: Dog, r: Rect): void {
   roundRect(ctx, mx, my, meterW, 7, 3.5);
   ctx.fill();
 
-  // green "perfect" zone marker
-  const zoneStart = mx + meterW * COOK.perfectFrom;
-  const zoneEnd = mx + meterW * COOK.goodTo;
+  const zoneStart = mx + meterW * (COOK.perfectFrom / COOK.meterMax);
+  const zoneEnd = mx + meterW * (COOK.overdoneFrom / COOK.meterMax);
   ctx.fillStyle = 'rgba(95,168,58,0.35)';
   ctx.fillRect(zoneStart, my, zoneEnd - zoneStart, 7);
 
   const grade = gradeOf(dog.cook);
-  const fillFrac = Math.min(1, dog.cook / COOK.burntAt);
+  const fillFrac = Math.min(1, dog.cook / COOK.meterMax);
   ctx.fillStyle =
-    grade === 'perfect' ? PALETTE.meterPerfect : grade === 'reject' && dog.cook < COOK.rawUntil ? PALETTE.meterRaw : PALETTE.meterBurnt;
+    grade === 'perfect' ? PALETTE.meterPerfect : grade === 'good' ? PALETTE.meterRaw : PALETTE.meterBurnt;
   roundRect(ctx, mx, my, meterW * fillFrac, 7, 3.5);
   ctx.fill();
+
+  if (grade === 'overdone') {
+    ctx.fillStyle = PALETTE.ember;
+    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('overdone · still sells', cx, r.y + 12);
+  }
 }
 
 function drawCustomers(ctx: CanvasRenderingContext2D, state: GameState): void {

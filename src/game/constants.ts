@@ -61,10 +61,17 @@ export const PAYOUT = {
   comboMax: 5,
 } as const;
 
-export const RULES = {
-  spawnInterval: 8, // s — constant, matches original timerCustomers.Interval = 8000ms
-  patience: 15, // s — original turns a waiting customer sad after 15s (timers[i].Interval = 15000)
-} as const;
+// SPEED MODE (not career): no cash goal — race the 90s clock for the highest score.
+// Difficulty ramps over the shift: customers arrive faster and grow less patient.
+
+// Shift phase boundaries (seconds): elapsed < RUSH = WARMUP, then RUSH, PEAK, CRUNCH.
+export const PHASES = { RUSH: 18, PEAK: 45, CRUNCH: 72 } as const;
+
+// Customer spawn cadence: the gap lerps startGap -> minGap over `rampTo` seconds, with ±jitter.
+export const SPAWN = { startGap: 8.0, minGap: 2.8, rampTo: 72, jitter: 0.25 } as const;
+
+// Patience shortens one step per phase (15 / 13 / 11 / 9 seconds), floored at min.
+export const PATIENCE = { base: 15, perPhaseDrop: 2, min: 9 } as const;
 
 // Cash that appears after a serve lingers on the counter, then vanishes (original moneyTimer = 2.5s).
 export const CASH = {

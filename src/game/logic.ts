@@ -1,6 +1,34 @@
-import { CASH, COOK, CUSTOMER, ORDER_COMBOS, PAYOUT, RULES, SHIFT, TABLE } from './constants.ts';
+import { CASH, COOK, CUSTOMER, ORDER_COMBOS, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE } from './constants.ts';
 import { customerSlotRect } from './geometry.ts';
 import type { CashToken, Customer, GameState, Grade, Order, Plate } from './types.ts';
+
+// ---------------------------------------------------------------------------
+// Speed-mode progression (pure, DOM-free, unit-testable)
+// ---------------------------------------------------------------------------
+export type ShiftPhase = 'WARMUP' | 'RUSH' | 'PEAK' | 'CRUNCH';
+
+export function phaseOf(elapsed: number): ShiftPhase {
+  if (elapsed < PHASES.RUSH) return 'WARMUP';
+  if (elapsed < PHASES.PEAK) return 'RUSH';
+  if (elapsed < PHASES.CRUNCH) return 'PEAK';
+  return 'CRUNCH';
+}
+
+const PHASE_INDEX: Record<ShiftPhase, number> = { WARMUP: 0, RUSH: 1, PEAK: 2, CRUNCH: 3 };
+
+/** Seconds until the next customer. Base gap lerps startGap -> minGap by `rampTo`, then ±jitter. */
+export function spawnGap(elapsed: number, rng: () => number = Math.random): number {
+  const t = Math.min(1, Math.max(0, elapsed / SPAWN.rampTo));
+  const base = SPAWN.startGap + (SPAWN.minGap - SPAWN.startGap) * t;
+  const jittered = base * (1 + (rng() * 2 - 1) * SPAWN.jitter);
+  return Math.min(SPAWN.startGap, Math.max(SPAWN.minGap, jittered));
+}
+
+/** Customer patience for the current phase (15 / 13 / 11 / 9 s), floored. */
+export function patienceFor(elapsed: number): number {
+  const p = PATIENCE.base - PATIENCE.perPhaseDrop * PHASE_INDEX[phaseOf(elapsed)];
+  return Math.max(PATIENCE.min, p);
+}
 
 export function createState(): GameState {
   return {
@@ -232,12 +260,13 @@ function spawnCustomer(state: GameState, rng: () => number): void {
   let slot = 0;
   while (used.has(slot) && slot < CUSTOMER.max) slot++;
   if (slot >= CUSTOMER.max) return;
+  const patience = patienceFor(state.elapsed);
   const c: Customer = {
     id: state.nextCustomerId++,
     slot,
     order: generateOrder(rng),
-    patience: RULES.patience,
-    patienceMax: RULES.patience,
+    patience,
+    patienceMax: patience,
     served: false,
     leaving: false,
     appear: 0,
@@ -274,7 +303,7 @@ export function step(state: GameState, dt: number, rng: () => number = Math.rand
   state.spawnTimer -= dt;
   if (state.spawnTimer <= 0) {
     spawnCustomer(state, rng);
-    state.spawnTimer = RULES.spawnInterval;
+    state.spawnTimer = spawnGap(state.elapsed, rng);
   }
 
   if (state.timeLeft <= 0 && state.phase === 'playing') {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { CASH, COOK, ORDER_COMBOS, PAYOUT, RULES, SHIFT } from '../src/game/constants.ts';
+import { CASH, COOK, ORDER_COMBOS, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN } from '../src/game/constants.ts';
 import {
   collectToken,
   createState,
@@ -9,10 +9,13 @@ import {
   generateOrder,
   gradeOf,
   isBurnt,
+  patienceFor,
+  phaseOf,
   placeBun,
   plateMatchesOrder,
   platePayout,
   servePlate,
+  spawnGap,
   startCooking,
   startGame,
   step,
@@ -225,8 +228,8 @@ describe('step / shift', () => {
     step(s, 8, () => 0);
     expect(s.dogs[0].cook).toBeCloseTo(8);
   });
-  test('patience is the original 15 seconds; running out is a miss', () => {
-    expect(RULES.patience).toBe(15);
+  test('patience starts at the original 15 seconds; running out is a miss', () => {
+    expect(patienceFor(0)).toBe(15);
     const s = playing();
     s.combo = 4;
     addCustomer(s, { sausage: true, ketchup: false, drink: false });
@@ -257,16 +260,58 @@ describe('step / shift', () => {
     expect(s.pending).toBe(0);
     expect(s.cash).toBe(0);
   });
-  test('customers spawn on the 8s cadence and animate in', () => {
+  test('customers keep spawning (regression: timer stays finite) and animate in', () => {
     const s = playing();
-    s.spawnTimer = RULES.spawnInterval;
-    step(s, RULES.spawnInterval + 0.1, () => 0);
+    // simulate the full shift in small ticks; the spawn timer must never go undefined
+    for (let i = 0; i < 900; i++) {
+      step(s, 0.1, () => 0.5);
+      expect(Number.isFinite(s.spawnTimer)).toBe(true);
+    }
+    expect(s.served + s.missed + s.customers.length).toBeGreaterThan(3); // many customers arrived
+  });
+
+  test('a fresh customer animates in over the next tick', () => {
+    const s = playing();
+    s.spawnTimer = 0.05;
+    step(s, 0.1, () => 0.5);
     expect(s.customers.length).toBeGreaterThanOrEqual(1);
-    step(s, 0.1, () => 0);
+    step(s, 0.1, () => 0.5);
     expect(s.customers[0].appear).toBeGreaterThan(0);
   });
   test('shift is 90 seconds', () => {
     expect(SHIFT.duration).toBe(90);
     expect(createState().timeLeft).toBe(90);
+  });
+});
+
+describe('speed-mode progression helpers', () => {
+  test('phaseOf boundaries', () => {
+    expect(phaseOf(PHASES.RUSH - 0.1)).toBe('WARMUP');
+    expect(phaseOf(PHASES.RUSH)).toBe('RUSH');
+    expect(phaseOf(PHASES.PEAK)).toBe('PEAK');
+    expect(phaseOf(PHASES.CRUNCH)).toBe('CRUNCH');
+  });
+
+  test('spawnGap shrinks over the shift and stays clamped', () => {
+    const mid = () => 0.5; // no jitter at 0.5
+    const early = spawnGap(0, mid);
+    const late = spawnGap(SPAWN.rampTo, mid);
+    expect(early).toBeCloseTo(SPAWN.startGap);
+    expect(late).toBeCloseTo(SPAWN.minGap);
+    expect(spawnGap(20, mid)).toBeLessThan(early);
+    // jitter never escapes the clamp
+    for (const r of [0, 1, 0.2, 0.9]) {
+      const g = spawnGap(40, () => r);
+      expect(g).toBeGreaterThanOrEqual(SPAWN.minGap - 1e-9);
+      expect(g).toBeLessThanOrEqual(SPAWN.startGap + 1e-9);
+    }
+  });
+
+  test('patienceFor steps down 15 / 13 / 11 / 9 by phase, floored', () => {
+    expect(patienceFor(0)).toBe(PATIENCE.base);
+    expect(patienceFor(PHASES.RUSH)).toBe(PATIENCE.base - PATIENCE.perPhaseDrop);
+    expect(patienceFor(PHASES.PEAK)).toBe(PATIENCE.base - 2 * PATIENCE.perPhaseDrop);
+    expect(patienceFor(PHASES.CRUNCH)).toBe(PATIENCE.min);
+    expect(patienceFor(1000)).toBeGreaterThanOrEqual(PATIENCE.min);
   });
 });

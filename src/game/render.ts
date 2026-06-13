@@ -201,6 +201,9 @@ function drawDog(ctx: CanvasRenderingContext2D, item: CookItem, r: Rect): void {
     return;
   }
 
+  // Grill items (sausage/patty) show doneness by sprite colour only — no cook meter.
+  if (item.kind === 'sausage' || item.kind === 'patty') return;
+
   const meterW = r.w - 16;
   const mx = r.x + 8;
   const my = r.y + r.h - 12;

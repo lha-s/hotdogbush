@@ -78,7 +78,18 @@ export interface GameState {
   spawnTimer: number;
 }
 
-export type Station = 'bun' | 'burgerBun' | 'ketchup' | 'mustard' | 'drink' | 'trash' | 'rawPatty' | 'rawPotato' | 'rawOnion';
+export type Station =
+  | 'bun'
+  | 'burgerBun'
+  | 'ketchup'
+  | 'mustard'
+  | 'trash'
+  | 'cola'
+  | 'lemonade'
+  | 'rawPatty'
+  | 'rawPotato'
+  | 'rawOnion'
+  | 'rawSausage';
 
 export interface ServeFx {
   x: number;

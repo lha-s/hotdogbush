@@ -1,8 +1,9 @@
 // Tunable game balance. Kept in one place so difficulty is easy to reason about.
 
+// 3:2 board matching the reference screenshot, so the calibrated zone spec maps 1:1 (px).
 export const BOARD = {
   width: 960,
-  height: 560,
+  height: 640,
 } as const;
 
 // A play session is a fixed 90-second shift (matches the original Hot Dog Bush).
@@ -10,37 +11,11 @@ export const SHIFT = {
   duration: 90, // seconds
 } as const;
 
-// Layout mirrors the original's zones (our own art): customers across the top with order bubbles
-// above their faces; condiments + trash down the left; the GRILL stacked on the RIGHT; the prep
-// table and hot-dog buns in the centre.
-export const GRILL = {
-  slots: 3, // original grill has 3 cook positions
-  x: 664, // right side
-  y: 150,
-  slotW: 284,
-  slotH: 80,
-  gap: 16, // stacked vertically
-} as const;
-
-// Prep table — build several orders at once (original Table holds 3 breads). Centre, horizontal.
-export const TABLE = {
-  slots: 3,
-  x: 156,
-  slotW: 150,
-  slotH: 124,
-  y: 246,
-  gap: 22,
-} as const;
-
-export const CUSTOMER = {
-  max: 5, // original has 5 customer spots
-  slotW: 176,
-  slotH: 86, // face card; the order ticket renders in a bubble above it
-  y: 56,
-  gap: 12,
-  bubbleY: 2,
-  bubbleH: 50,
-} as const;
+// Slot counts only — the exact rects live in geometry.ts (calibrated from the real game's layout):
+//   grill = 3 patty + 3 sausage positions; prep table = 3 hot-dog + 3 burger lanes.
+export const GRILL = { slots: 6 } as const;
+export const TABLE = { slots: 6, dogLanes: 3, burgerLanes: 3 } as const;
+export const CUSTOMER = { max: 5 } as const;
 
 // Cooking is measured in SECONDS of grill time and matches the original's doneness steps:
 //   0–7s   = underdone (servable, lower pay)

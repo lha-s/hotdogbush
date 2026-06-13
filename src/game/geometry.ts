@@ -1,4 +1,3 @@
-import { BOARD, CUSTOMER, GRILL, TABLE } from './constants.ts';
 import type { Station } from './types.ts';
 
 export interface Rect {
@@ -12,53 +11,87 @@ export function pointInRect(px: number, py: number, r: Rect): boolean {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 }
 
-function rowStart(count: number, slotW: number, gap: number): number {
-  return (BOARD.width - (count * slotW + (count - 1) * gap)) / 2;
-}
+// ---------------------------------------------------------------------------
+// Calibrated zone rects (px @ 960x640). Traced from the real game's layout via
+// an overlay calibration pass — our own coordinates, our own art.
+// ---------------------------------------------------------------------------
 
-// ---- grill (right side, stacked vertically) ----
+// Grill: 3 patty positions (left) + 3 sausage positions (right), on the up-right diagonal.
+const GRILL_SLOTS: Rect[] = [
+  { x: 699, y: 410, w: 110, h: 83 }, // 0 patty A
+  { x: 713, y: 352, w: 110, h: 83 }, // 1 patty B
+  { x: 728, y: 294, w: 110, h: 83 }, // 2 patty C
+  { x: 824, y: 403, w: 125, h: 70 }, // 3 sausage A
+  { x: 833, y: 352, w: 120, h: 70 }, // 4 sausage B
+  { x: 843, y: 301, w: 115, h: 70 }, // 5 sausage C
+];
 export function grillSlotRect(slot: number): Rect {
-  return { x: GRILL.x, y: GRILL.y + slot * (GRILL.slotH + GRILL.gap), w: GRILL.slotW, h: GRILL.slotH };
+  return GRILL_SLOTS[slot];
 }
+/** Slots 0–2 are patty positions; 3–5 are sausage positions (visual hint, not a hard rule). */
+export const GRILL_PATTY_SLOTS = [0, 1, 2];
+export const GRILL_SAUSAGE_SLOTS = [3, 4, 5];
 
-// ---- prep table (centre, horizontal) ----
+// Prep table: 3 hot-dog lanes (stacked) + 3 burger lanes (up-right diagonal).
+const TABLE_SLOTS: Rect[] = [
+  { x: 314, y: 352, w: 160, h: 52 }, // 0 hot-dog lane A
+  { x: 314, y: 404, w: 160, h: 52 }, // 1 hot-dog lane B
+  { x: 314, y: 457, w: 160, h: 55 }, // 2 hot-dog lane C
+  { x: 484, y: 419, w: 86, h: 64 }, // 3 burger lane A
+  { x: 497, y: 358, w: 86, h: 64 }, // 4 burger lane B
+  { x: 511, y: 298, w: 86, h: 64 }, // 5 burger lane C
+];
 export function tableSlotRect(slot: number): Rect {
-  return { x: TABLE.x + slot * (TABLE.slotW + TABLE.gap), y: TABLE.y, w: TABLE.slotW, h: TABLE.slotH };
+  return TABLE_SLOTS[slot];
 }
+export const DOG_LANES = [0, 1, 2];
+export const BURGER_LANES = [3, 4, 5];
 
-// ---- customers (top row) ----
-const custStartX = rowStart(CUSTOMER.max, CUSTOMER.slotW, CUSTOMER.gap);
-export function customerSlotRect(slot: number): Rect {
-  return { x: custStartX + slot * (CUSTOMER.slotW + CUSTOMER.gap), y: CUSTOMER.y, w: CUSTOMER.slotW, h: CUSTOMER.slotH };
-}
-/** The speech-bubble order ticket drawn above each customer's face. */
-export function customerBubbleRect(slot: number): Rect {
-  const face = customerSlotRect(slot);
-  return { x: face.x + 8, y: CUSTOMER.bubbleY, w: face.w - 16, h: CUSTOMER.bubbleH };
-}
-
-// ---- appliances: fryer (left) and onion pan (bottom-centre) ----
-export const FRYER = { x: 10, y: 356, w: 128, h: 96, slots: 2 } as const;
-export const PAN = { x: 268, y: 452, w: 130, h: 92, slots: 2 } as const;
-
+// Fryer (one batch) and the two diagonal onion pans.
+export const FRYER = { slots: 1 } as const;
+const FRYER_SLOTS: Rect[] = [{ x: 104, y: 352, w: 206, h: 160 }];
 export function fryerSlotRect(slot: number): Rect {
-  return { x: FRYER.x + 6 + slot * 60, y: FRYER.y + 6, w: 54, h: FRYER.h - 12 };
-}
-export function panSlotRect(slot: number): Rect {
-  return { x: PAN.x + 6 + slot * 60, y: PAN.y + 6, w: 54, h: PAN.h - 12 };
+  return FRYER_SLOTS[slot];
 }
 
-// ---- stations: condiments + trash + raw sources ----
+export const PAN = { slots: 2 } as const;
+const PAN_SLOTS: Rect[] = [
+  { x: 603, y: 323, w: 86, h: 90 }, // onion pan A (upper-right)
+  { x: 569, y: 406, w: 88, h: 96 }, // onion pan B (lower-left)
+];
+export function panSlotRect(slot: number): Rect {
+  return PAN_SLOTS[slot];
+}
+
+// Customers across the top; the order ticket renders in a bubble above each face.
+const CUSTOMER_SLOTS: Rect[] = [
+  { x: 3, y: 125, w: 188, h: 192 },
+  { x: 192, y: 125, w: 188, h: 192 },
+  { x: 384, y: 125, w: 188, h: 192 },
+  { x: 576, y: 125, w: 188, h: 192 },
+  { x: 768, y: 125, w: 189, h: 192 },
+];
+export function customerSlotRect(slot: number): Rect {
+  return CUSTOMER_SLOTS[slot];
+}
+export function customerBubbleRect(slot: number): Rect {
+  const f = CUSTOMER_SLOTS[slot];
+  return { x: f.x + 6, y: 6, w: f.w - 12, h: 108 };
+}
+
+// Stations: condiments + trash on the left, bun-placers, and the bottom source shelf.
 export const STATION_RECTS: Record<Station, Rect> = {
-  ketchup: { x: 10, y: 150, w: 62, h: 64 },
-  mustard: { x: 76, y: 150, w: 62, h: 64 },
-  trash: { x: 10, y: 222, w: 128, h: 64 },
-  drink: { x: 10, y: 286, w: 128, h: 62 }, // left column, above the fryer
-  bun: { x: 284, y: 150, w: 118, h: 66 }, // hot-dog bun source (centre)
-  burgerBun: { x: 408, y: 150, w: 118, h: 66 }, // burger bun source (centre)
-  rawPotato: { x: 148, y: 452, w: 108, h: 92 }, // drag onto the fryer
-  rawOnion: { x: 410, y: 452, w: 108, h: 92 }, // drag onto the pan
-  rawPatty: { x: 530, y: 452, w: 108, h: 92 }, // drag onto the grill
+  ketchup: { x: 9, y: 266, w: 35, h: 99 },
+  mustard: { x: 44, y: 266, w: 36, h: 99 },
+  trash: { x: 6, y: 365, w: 131, h: 144 },
+  bun: { x: 243, y: 515, w: 169, h: 83 }, // hot-dog bun source
+  burgerBun: { x: 414, y: 515, w: 130, h: 83 }, // burger bun source
+  cola: { x: 6, y: 515, w: 50, h: 83 },
+  lemonade: { x: 58, y: 515, w: 54, h: 83 },
+  rawPotato: { x: 115, y: 515, w: 129, h: 83 }, // -> fryer
+  rawOnion: { x: 545, y: 515, w: 96, h: 83 }, // -> pan
+  rawPatty: { x: 643, y: 515, w: 147, h: 83 }, // -> grill
+  rawSausage: { x: 790, y: 515, w: 167, h: 83 }, // -> grill
 };
 
 export type Target =
@@ -71,23 +104,11 @@ export type Target =
 
 /** Hit-test a board-space point against the static layout (cash tokens are tested separately). */
 export function targetAt(px: number, py: number): Target | null {
-  for (let s = 0; s < GRILL.slots; s++) {
-    if (pointInRect(px, py, grillSlotRect(s))) return { kind: 'grill', slot: s };
-  }
-  for (let s = 0; s < FRYER.slots; s++) {
-    if (pointInRect(px, py, fryerSlotRect(s))) return { kind: 'fryer', slot: s };
-  }
-  for (let s = 0; s < PAN.slots; s++) {
-    if (pointInRect(px, py, panSlotRect(s))) return { kind: 'pan', slot: s };
-  }
-  for (let s = 0; s < TABLE.slots; s++) {
-    if (pointInRect(px, py, tableSlotRect(s))) return { kind: 'table', slot: s };
-  }
-  for (let s = 0; s < CUSTOMER.max; s++) {
-    if (pointInRect(px, py, customerSlotRect(s))) return { kind: 'customer', slot: s };
-  }
-  for (const station of Object.keys(STATION_RECTS) as Station[]) {
-    if (pointInRect(px, py, STATION_RECTS[station])) return { kind: 'station', station };
-  }
+  for (let s = 0; s < GRILL_SLOTS.length; s++) if (pointInRect(px, py, GRILL_SLOTS[s])) return { kind: 'grill', slot: s };
+  for (let s = 0; s < FRYER.slots; s++) if (pointInRect(px, py, FRYER_SLOTS[s])) return { kind: 'fryer', slot: s };
+  for (let s = 0; s < PAN.slots; s++) if (pointInRect(px, py, PAN_SLOTS[s])) return { kind: 'pan', slot: s };
+  for (let s = 0; s < TABLE_SLOTS.length; s++) if (pointInRect(px, py, TABLE_SLOTS[s])) return { kind: 'table', slot: s };
+  for (let s = 0; s < CUSTOMER_SLOTS.length; s++) if (pointInRect(px, py, CUSTOMER_SLOTS[s])) return { kind: 'customer', slot: s };
+  for (const station of Object.keys(STATION_RECTS) as Station[]) if (pointInRect(px, py, STATION_RECTS[station])) return { kind: 'station', station };
   return null;
 }

@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest';
-import { CASH, COOK, FRYER_COOK, PAN_COOK, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, UNLOCK } from '../src/game/constants.ts';
+import { BOARD, CASH, COOK, FRYER_COOK, GRILL, PAN_COOK, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from '../src/game/constants.ts';
+import {
+  customerSlotRect,
+  fryerSlotRect,
+  grillSlotRect,
+  panSlotRect,
+  STATION_RECTS,
+  tableSlotRect,
+  type Rect,
+} from '../src/game/geometry.ts';
+import type { Station } from '../src/game/types.ts';
 import {
   collectToken,
   createState,
@@ -183,7 +193,7 @@ describe('drag & drop assembly', () => {
     const s = playing();
     addCustomer(s, { burger: true });
     const slot = placeBurgerBun(s);
-    expect(slot).toBe(0);
+    expect(slot).toBe(3); // burger lanes are slots 3..5
     startCooking(s, 0, 'patty');
     s.dogs[0].cook = 10; // perfect
     expect(s.dogs[0].kind).toBe('patty');
@@ -449,3 +459,41 @@ describe('speed-mode progression helpers', () => {
     expect(patienceFor(1000)).toBeGreaterThanOrEqual(PATIENCE.min);
   });
 });
+
+describe('baked calibration layout', () => {
+  const inBounds = (r: Rect) => r.x >= 0 && r.y >= 0 && r.x + r.w <= BOARD.width && r.y + r.h <= BOARD.height;
+
+  test('board is 960x640 (3:2)', () => {
+    expect(BOARD.width).toBe(960);
+    expect(BOARD.height).toBe(640);
+  });
+
+  test('grill has 6 slots (3 patty + 3 sausage), table has 6 lanes (3 dog + 3 burger)', () => {
+    expect(GRILL.slots).toBe(6);
+    expect(TABLE.slots).toBe(6);
+    expect(TABLE.dogLanes + TABLE.burgerLanes).toBe(TABLE.slots);
+  });
+
+  test('hot-dog buns fill lanes 0..2; burger buns fill lanes 3..5', () => {
+    const s = playing();
+    expect(placeBun(s)).toBe(0);
+    expect(placeBun(s)).toBe(1);
+    expect(placeBun(s)).toBe(2);
+    expect(placeBun(s)).toBe(-1); // dog lanes full
+    expect(placeBurgerBun(s)).toBe(3);
+    expect(placeBurgerBun(s)).toBe(4);
+    expect(placeBurgerBun(s)).toBe(5);
+    expect(placeBurgerBun(s)).toBe(-1); // burger lanes full
+  });
+
+  test('every calibrated zone rect sits inside the board', () => {
+    for (let i = 0; i < GRILL.slots; i++) expect(inBounds(grillSlotRect(i))).toBe(true);
+    for (let i = 0; i < TABLE.slots; i++) expect(inBounds(tableSlotRect(i))).toBe(true);
+    expect(inBounds(fryerSlotRect(0))).toBe(true);
+    expect(inBounds(panSlotRect(0))).toBe(true);
+    expect(inBounds(panSlotRect(1))).toBe(true);
+    for (let i = 0; i < CUSTOMER_MAX; i++) expect(inBounds(customerSlotRect(i))).toBe(true);
+    for (const st of Object.keys(STATION_RECTS) as Station[]) expect(inBounds(STATION_RECTS[st])).toBe(true);
+  });
+});
+const CUSTOMER_MAX = 5;

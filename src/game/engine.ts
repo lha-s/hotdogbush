@@ -42,7 +42,8 @@ export type DragKind =
   | 'drink'
   | 'rawPatty'
   | 'rawPotato'
-  | 'rawOnion';
+  | 'rawOnion'
+  | 'rawSausage';
 const COOKED_KINDS: DragKind[] = ['sausage', 'patty', 'fries', 'onion'];
 export interface DragState {
   kind: DragKind;
@@ -155,10 +156,11 @@ export class Engine {
     if (t.kind === 'station') {
       if (t.station === 'ketchup') return { kind: 'ketchup', x, y };
       if (t.station === 'mustard') return { kind: 'mustard', x, y };
-      if (t.station === 'drink') return { kind: 'drink', x, y };
+      if (t.station === 'cola' || t.station === 'lemonade') return { kind: 'drink', x, y };
       if (t.station === 'rawPatty') return { kind: 'rawPatty', x, y };
       if (t.station === 'rawPotato') return { kind: 'rawPotato', x, y };
       if (t.station === 'rawOnion') return { kind: 'rawOnion', x, y };
+      if (t.station === 'rawSausage') return { kind: 'rawSausage', x, y };
     }
     return null;
   }
@@ -206,6 +208,8 @@ export class Engine {
       }
     } else if (drag.kind === 'rawPatty') {
       if (t?.kind === 'grill' && startCooking(this.state, t.slot, 'patty')) this.pushFx(x, y, 'patty on!', PALETTE.meterPerfect);
+    } else if (drag.kind === 'rawSausage') {
+      if (t?.kind === 'grill' && startCooking(this.state, t.slot, 'sausage')) this.pushFx(x, y, 'sausage on!', PALETTE.meterPerfect);
     } else if (drag.kind === 'rawPotato') {
       if (t?.kind === 'fryer' && startFrying(this.state, t.slot)) this.pushFx(x, y, 'fries in!', PALETTE.meterPerfect);
     } else if (drag.kind === 'rawOnion') {

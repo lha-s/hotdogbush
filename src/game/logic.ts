@@ -140,9 +140,6 @@ export function plateIsEmpty(plate: Plate | null): boolean {
   return !plate || (plate.sausage === null && plate.patty === null && plate.fries === null && !plate.drink && !plate.ketchup);
 }
 
-function firstEmptySlot(state: GameState): number {
-  return state.plates.findIndex((p) => p === null);
-}
 
 // ---------------------------------------------------------------------------
 // Taps (no drag): cook / toss a burnt dog / drop a fresh bun on the table
@@ -188,19 +185,25 @@ export function tapGrill(state: GameState, slot: number): GrillTap {
   return tapAppliance(state, 'grill', slot);
 }
 
-/** Tap the Bun station to place a fresh hot-dog bun on the next empty table plate. Returns slot or -1. */
+/** First empty plate within [start, start+count). */
+function firstEmptyInRange(state: GameState, start: number, count: number): number {
+  for (let i = start; i < start + count; i++) if (state.plates[i] == null) return i;
+  return -1;
+}
+
+/** Tap the Bun station to place a hot-dog bun on the next free hot-dog lane (slots 0..2). */
 export function placeBun(state: GameState): number {
   if (state.phase !== 'playing') return -1;
-  const slot = firstEmptySlot(state);
+  const slot = firstEmptyInRange(state, 0, TABLE.dogLanes);
   if (slot === -1) return -1;
   state.plates[slot] = emptyPlate({ bun: true });
   return slot;
 }
 
-/** Tap the Burger-Bun station to place a fresh burger bun on the next empty table plate. */
+/** Tap the Burger-Bun station to place a burger bun on the next free burger lane (slots 3..5). */
 export function placeBurgerBun(state: GameState): number {
   if (state.phase !== 'playing') return -1;
-  const slot = firstEmptySlot(state);
+  const slot = firstEmptyInRange(state, TABLE.dogLanes, TABLE.burgerLanes);
   if (slot === -1) return -1;
   state.plates[slot] = emptyPlate({ burgerBun: true });
   return slot;

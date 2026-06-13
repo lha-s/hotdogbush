@@ -23,8 +23,9 @@ function drawBackground(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = '#181009';
     ctx.fillRect(0, 0, BOARD.width, BOARD.height);
   }
+  const counterTop = 318; // below the customers; the working counter begins here
   ctx.fillStyle = 'rgba(20,14,9,0.78)';
-  ctx.fillRect(0, GRILL.y - 30, BOARD.width, BOARD.height - GRILL.y + 30);
+  ctx.fillRect(0, counterTop, BOARD.width, BOARD.height - counterTop);
 }
 
 // ---- stations ----
@@ -102,29 +103,35 @@ function drawTrashIcon(ctx: CanvasRenderingContext2D, r: Rect): void {
 
 function drawStations(ctx: CanvasRenderingContext2D, state: GameState): void {
   const plates = state.plates;
-  const hasEmpty = plates.includes(null);
   const canKetchup = plates.some((p) => p && (p.sausage !== null || p.patty !== null) && !p.ketchup);
-  const canDrink = hasEmpty || plates.some((p) => p && !p.drink);
-
-  drawStationBox(ctx, STATION_RECTS.bun, 'Bun', hasEmpty);
-  drawBunIcon(ctx, STATION_RECTS.bun);
-  drawStationBox(ctx, STATION_RECTS.burgerBun, 'Burger Bun', hasEmpty);
-  drawBurgerBunIcon(ctx, STATION_RECTS.burgerBun);
   const canMustard = plates.some((p) => p && (p.sausage !== null || p.patty !== null) && !p.mustard);
-  drawStationBox(ctx, STATION_RECTS.ketchup, 'Ketchup', canKetchup);
-  drawBottleIcon(ctx, STATION_RECTS.ketchup.x + STATION_RECTS.ketchup.w / 2, STATION_RECTS.ketchup.y + 14, PALETTE.ketchup, '#7a1d13');
-  drawStationBox(ctx, STATION_RECTS.mustard, 'Mustard', canMustard);
-  drawBottleIcon(ctx, STATION_RECTS.mustard.x + STATION_RECTS.mustard.w / 2, STATION_RECTS.mustard.y + 14, PALETTE.mustard, '#8a6606');
-  drawStationBox(ctx, STATION_RECTS.drink, 'Drink', canDrink);
-  drawDrinkIcon(ctx, STATION_RECTS.drink.x + STATION_RECTS.drink.w / 2, STATION_RECTS.drink.y + 12);
-  drawStationBox(ctx, STATION_RECTS.rawPatty, 'Patties', true);
-  drawPattyIcon(ctx, STATION_RECTS.rawPatty);
-  drawStationBox(ctx, STATION_RECTS.rawPotato, 'Potatoes', true);
-  drawSourceSprite(ctx, STATION_RECTS.rawPotato, 'friesRaw');
-  drawStationBox(ctx, STATION_RECTS.rawOnion, 'Onions', true);
-  drawSourceSprite(ctx, STATION_RECTS.rawOnion, 'onionRaw');
-  drawStationBox(ctx, STATION_RECTS.trash, 'Trash', false);
-  drawTrashIcon(ctx, STATION_RECTS.trash);
+  const r = STATION_RECTS;
+
+  // condiments (left)
+  drawStationBox(ctx, r.ketchup, 'Ketchup', canKetchup);
+  drawBottleIcon(ctx, r.ketchup.x + r.ketchup.w / 2, r.ketchup.y + 14, PALETTE.ketchup, '#7a1d13');
+  drawStationBox(ctx, r.mustard, 'Mustard', canMustard);
+  drawBottleIcon(ctx, r.mustard.x + r.mustard.w / 2, r.mustard.y + 14, PALETTE.mustard, '#8a6606');
+  drawStationBox(ctx, r.trash, 'Trash', false);
+  drawTrashIcon(ctx, r.trash);
+
+  // bottom source shelf
+  drawStationBox(ctx, r.cola, 'Cola', true);
+  drawDrinkIcon(ctx, r.cola.x + r.cola.w / 2, r.cola.y + 16);
+  drawStationBox(ctx, r.lemonade, 'Lemonade', true);
+  drawDrinkIcon(ctx, r.lemonade.x + r.lemonade.w / 2, r.lemonade.y + 16);
+  drawStationBox(ctx, r.rawPotato, 'Potatoes', true);
+  drawSourceSprite(ctx, r.rawPotato, 'friesRaw');
+  drawStationBox(ctx, r.bun, 'Hot-dog buns', true);
+  drawBunIcon(ctx, r.bun);
+  drawStationBox(ctx, r.burgerBun, 'Burger buns', true);
+  drawBurgerBunIcon(ctx, r.burgerBun);
+  drawStationBox(ctx, r.rawOnion, 'Onions', true);
+  drawSourceSprite(ctx, r.rawOnion, 'onionRaw');
+  drawStationBox(ctx, r.rawPatty, 'Patties', true);
+  drawPattyIcon(ctx, r.rawPatty);
+  drawStationBox(ctx, r.rawSausage, 'Sausages', true);
+  drawSourceSprite(ctx, r.rawSausage, 'sausageRaw');
 }
 
 function drawSourceSprite(ctx: CanvasRenderingContext2D, r: Rect, key: SpriteKey): void {
@@ -193,7 +200,7 @@ function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('GRILL', GRILL.x + GRILL.slotW / 2, GRILL.y - 6);
+  ctx.fillText('GRILL', 828, grillSlotRect(2).y - 8);
 }
 
 function drawDog(ctx: CanvasRenderingContext2D, item: CookItem, r: Rect): void {
@@ -339,7 +346,7 @@ function drawTable(ctx: CanvasRenderingContext2D, state: GameState, hoverSlot: n
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('PREP TABLE — drop cooked items & toppings here', TABLE.x + (TABLE.slots * TABLE.slotW + (TABLE.slots - 1) * TABLE.gap) / 2, TABLE.y - 6);
+  ctx.fillText('PREP — place a bun, then drop cooked items & toppings', tableSlotRect(0).x + 80, tableSlotRect(5).y - 8);
 }
 
 // ---- customers ----
@@ -462,7 +469,7 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: ServeFx[]): void {
 
 // ---- drag ghost + drop-target highlight ----
 export interface DragView {
-  kind: 'sausage' | 'patty' | 'fries' | 'onion' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty' | 'rawPotato' | 'rawOnion';
+  kind: 'sausage' | 'patty' | 'fries' | 'onion' | 'plate' | 'ketchup' | 'mustard' | 'drink' | 'rawPatty' | 'rawPotato' | 'rawOnion' | 'rawSausage';
   x: number;
   y: number;
   slot?: number;
@@ -550,7 +557,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
     ctx.font = '700 18px Arial Black, system-ui, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width - 160, GRILL.y - 24);
+    ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width - 12, 322);
   }
 
   if (drag) {

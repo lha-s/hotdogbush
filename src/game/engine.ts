@@ -2,6 +2,10 @@ import { PALETTE } from './constants.ts';
 import { targetAt } from './geometry.ts';
 import {
   collectToken,
+  cookFries,
+  cookOnion,
+  cookPatty,
+  cookSausage,
   createState,
   dropCookedOnPlate,
   dropDrink,
@@ -11,10 +15,7 @@ import {
   placeBurgerBun,
   isBurntItem,
   servePlate,
-  startCooking,
-  startFrying,
   startGame,
-  startPan,
   step,
   tapAppliance,
   tokenAt,
@@ -157,10 +158,7 @@ export class Engine {
       if (t.station === 'ketchup') return { kind: 'ketchup', x, y };
       if (t.station === 'mustard') return { kind: 'mustard', x, y };
       if (t.station === 'cola' || t.station === 'lemonade') return { kind: 'drink', x, y };
-      if (t.station === 'rawPatty') return { kind: 'rawPatty', x, y };
-      if (t.station === 'rawPotato') return { kind: 'rawPotato', x, y };
-      if (t.station === 'rawOnion') return { kind: 'rawOnion', x, y };
-      if (t.station === 'rawSausage') return { kind: 'rawSausage', x, y };
+      // raw ingredients (patty/potato/onion/sausage) are TAP-to-cook, not drag sources
     }
     return null;
   }
@@ -206,14 +204,6 @@ export class Engine {
         else if (res === 'busy') this.pushFx(x, y, 'already on it', PALETTE.meterRaw);
         else if (res === 'bad') this.pushFx(x, y, drag.kind === 'onion' ? 'needs a protein' : 'no', PALETTE.meterRaw);
       }
-    } else if (drag.kind === 'rawPatty') {
-      if (t?.kind === 'grill' && startCooking(this.state, t.slot, 'patty')) this.pushFx(x, y, 'patty on!', PALETTE.meterPerfect);
-    } else if (drag.kind === 'rawSausage') {
-      if (t?.kind === 'grill' && startCooking(this.state, t.slot, 'sausage')) this.pushFx(x, y, 'sausage on!', PALETTE.meterPerfect);
-    } else if (drag.kind === 'rawPotato') {
-      if (t?.kind === 'fryer' && startFrying(this.state, t.slot)) this.pushFx(x, y, 'fries in!', PALETTE.meterPerfect);
-    } else if (drag.kind === 'rawOnion') {
-      if (t?.kind === 'pan' && startPan(this.state, t.slot)) this.pushFx(x, y, 'onions on!', PALETTE.meterPerfect);
     } else if (drag.kind === 'plate' && drag.slot != null) {
       if (onTrash) {
         if (trashPlate(this.state, drag.slot)) this.pushFx(x, y, 'trashed', PALETTE.meterBurnt);
@@ -242,6 +232,18 @@ export class Engine {
       if (placeBun(this.state) !== -1) this.pushFx(x, y, '+ bun', PALETTE.text);
     } else if (t.kind === 'station' && t.station === 'burgerBun') {
       if (placeBurgerBun(this.state) !== -1) this.pushFx(x, y, '+ burger bun', PALETTE.text);
+    } else if (t.kind === 'station' && t.station === 'rawPatty') {
+      if (cookPatty(this.state) >= 0) this.pushFx(x, y, 'patty on!', PALETTE.meterPerfect);
+      else this.pushFx(x, y, 'grill full', PALETTE.meterRaw);
+    } else if (t.kind === 'station' && t.station === 'rawSausage') {
+      if (cookSausage(this.state) >= 0) this.pushFx(x, y, 'sausage on!', PALETTE.meterPerfect);
+      else this.pushFx(x, y, 'grill full', PALETTE.meterRaw);
+    } else if (t.kind === 'station' && t.station === 'rawPotato') {
+      if (cookFries(this.state) >= 0) this.pushFx(x, y, 'fries in!', PALETTE.meterPerfect);
+      else this.pushFx(x, y, 'fryer full', PALETTE.meterRaw);
+    } else if (t.kind === 'station' && t.station === 'rawOnion') {
+      if (cookOnion(this.state) >= 0) this.pushFx(x, y, 'onions on!', PALETTE.meterPerfect);
+      else this.pushFx(x, y, 'pans full', PALETTE.meterRaw);
     }
   }
 

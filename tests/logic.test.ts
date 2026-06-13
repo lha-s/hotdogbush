@@ -12,6 +12,10 @@ import {
 import type { Station } from '../src/game/types.ts';
 import {
   collectToken,
+  cookFries,
+  cookOnion,
+  cookPatty,
+  cookSausage,
   createState,
   dropCookedOnPlate,
   dropDrink,
@@ -131,20 +135,42 @@ describe('order matching (ketchup is a modifier, not a gate)', () => {
   });
 });
 
-describe('taps: cook, toss, place bun', () => {
-  test('tapping an empty grill slot starts cooking; a cooked one says grab (drag it)', () => {
+describe('cook from the raw-ingredient sources (tap), not the grill', () => {
+  test('tapping an empty grill slot does nothing; a cooked item says grab (drag it)', () => {
     const s = playing();
-    expect(tapGrill(s, 0)).toBe('cooking');
+    expect(tapGrill(s, 0)).toBe('none'); // no auto-cook on the grill
+    cookPatty(s);
     s.dogs[0].cook = 10;
-    expect(tapGrill(s, 0)).toBe('grab');
+    expect(tapGrill(s, s.dogs[0].slot)).toBe('grab');
   });
-  test('tapping a burnt grill slot tosses it', () => {
+  test('clicking raw patties / sausages fills the patty (0..2) / sausage (3..5) positions', () => {
+    const s = playing();
+    expect(cookPatty(s)).toBe(0);
+    expect(cookPatty(s)).toBe(1);
+    expect(cookPatty(s)).toBe(2);
+    expect(cookPatty(s)).toBe(-1); // patty positions full
+    expect(cookSausage(s)).toBe(3);
+    expect(cookSausage(s)).toBe(4);
+    expect(cookSausage(s)).toBe(5);
+    expect(cookSausage(s)).toBe(-1);
+    expect(s.dogs.filter((d) => d.kind === 'patty')).toHaveLength(3);
+    expect(s.dogs.filter((d) => d.kind === 'sausage')).toHaveLength(3);
+  });
+  test('clicking potatoes fills the fryer; clicking onions fills the pans', () => {
+    const s = playing();
+    expect(cookFries(s)).toBe(0);
+    expect(cookFries(s)).toBe(-1); // single fryer slot
+    expect(cookOnion(s)).toBe(0);
+    expect(cookOnion(s)).toBe(1);
+    expect(cookOnion(s)).toBe(-1); // two pans
+  });
+  test('tapping a burnt grill item tosses it', () => {
     const s = playing();
     cookOne(s, COOK.burntFrom + 1);
     expect(tapGrill(s, 0)).toBe('tossed');
     expect(s.dogs).toHaveLength(0);
   });
-  test('Bun fills the next empty table slot, then refuses when full', () => {
+  test('Bun fills hot-dog lanes 0..2, then refuses', () => {
     const s = playing();
     expect(placeBun(s)).toBe(0);
     expect(placeBun(s)).toBe(1);

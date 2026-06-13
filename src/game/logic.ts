@@ -1,5 +1,5 @@
 import { APPLIANCE_COOK, CASH, COOK, CUSTOMER, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from './constants.ts';
-import { customerSlotRect } from './geometry.ts';
+import { FRYER, GRILL_PATTY_SLOTS, GRILL_SAUSAGE_SLOTS, PAN, customerSlotRect } from './geometry.ts';
 import type { CashToken, CookItem, CookStation, Customer, GameState, Grade, Order, Plate } from './types.ts';
 
 // ---------------------------------------------------------------------------
@@ -166,13 +166,13 @@ export function startPan(state: GameState, slot: number): boolean {
   return startOn(state, 'pan', slot, 'onion');
 }
 
-export type GrillTap = 'cooking' | 'tossed' | 'grab' | 'none';
+export type GrillTap = 'tossed' | 'grab' | 'none';
 
-/** Tap an appliance slot: empty grill -> cook sausage; burnt -> toss; cooked -> nothing (drag it). */
+/** Tap an item on an appliance: burnt -> toss it; cooked -> nothing (you drag it to a plate). */
 export function tapAppliance(state: GameState, station: CookStation, slot: number): GrillTap {
   if (state.phase !== 'playing') return 'none';
   const item = itemAt(state, station, slot);
-  if (!item) return station === 'grill' && startCooking(state, slot) ? 'cooking' : 'none';
+  if (!item) return 'none'; // cooking is started from the raw-ingredient sources, not the grill
   if (isBurntItem(item)) {
     state.dogs = state.dogs.filter((d) => d !== item);
     return 'tossed';
@@ -180,9 +180,43 @@ export function tapAppliance(state: GameState, station: CookStation, slot: numbe
   return 'grab';
 }
 
-/** Back-compat: tapping a grill slot. */
+/** Back-compat alias. */
 export function tapGrill(state: GameState, slot: number): GrillTap {
   return tapAppliance(state, 'grill', slot);
+}
+
+// --- cook from a raw-ingredient source: drop onto the next free slot of its appliance ---
+function firstFree(state: GameState, station: CookStation, slots: readonly number[]): number {
+  for (const s of slots) if (!itemAt(state, station, s)) return s;
+  return -1;
+}
+
+/** Click the raw patties → start a patty on the next free patty position. Returns slot or -1. */
+export function cookPatty(state: GameState): number {
+  if (state.phase !== 'playing') return -1;
+  const slot = firstFree(state, 'grill', GRILL_PATTY_SLOTS);
+  return slot >= 0 && startOn(state, 'grill', slot, 'patty') ? slot : -1;
+}
+
+/** Click the raw sausages → start a sausage on the next free sausage position. */
+export function cookSausage(state: GameState): number {
+  if (state.phase !== 'playing') return -1;
+  const slot = firstFree(state, 'grill', GRILL_SAUSAGE_SLOTS);
+  return slot >= 0 && startOn(state, 'grill', slot, 'sausage') ? slot : -1;
+}
+
+/** Click the potatoes → drop fries into the next free fryer position. */
+export function cookFries(state: GameState): number {
+  if (state.phase !== 'playing') return -1;
+  for (let s = 0; s < FRYER.slots; s++) if (!itemAt(state, 'fryer', s)) return startOn(state, 'fryer', s, 'fries') ? s : -1;
+  return -1;
+}
+
+/** Click the onions → drop onions into the next free pan position. */
+export function cookOnion(state: GameState): number {
+  if (state.phase !== 'playing') return -1;
+  for (let s = 0; s < PAN.slots; s++) if (!itemAt(state, 'pan', s)) return startOn(state, 'pan', s, 'onion') ? s : -1;
+  return -1;
 }
 
 /** First empty plate within [start, start+count). */

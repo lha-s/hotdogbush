@@ -170,32 +170,12 @@ function itemSpriteKey(item: CookItem): SpriteKey {
 }
 
 function drawGrill(ctx: CanvasRenderingContext2D, state: GameState): void {
+  // The grill itself is part of the counter art — we only draw the items cooking on it,
+  // so it reads as one big grill (no per-slot wells / "mini grills").
   for (let s = 0; s < GRILL.slots; s++) {
-    const r = grillSlotRect(s);
-    const dog = state.dogs.find((d) => d.station === 'grill' && d.slot === s);
-    ctx.fillStyle = dog ? PALETTE.grillHot : PALETTE.grillCold;
-    roundRect(ctx, r.x, r.y, r.w, r.h, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 3;
-    for (let i = 1; i < 5; i++) {
-      const gx = r.x + (r.w / 5) * i;
-      ctx.beginPath();
-      ctx.moveTo(gx, r.y + 6);
-      ctx.lineTo(gx, r.y + r.h - 6);
-      ctx.stroke();
-    }
-    if (!dog) {
-      ctx.fillStyle = PALETTE.muted;
-      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('tap to cook', r.x + r.w / 2, r.y + r.h / 2);
-      continue;
-    }
-    drawDog(ctx, dog, r);
+    const item = state.dogs.find((d) => d.station === 'grill' && d.slot === s);
+    if (item) drawDog(ctx, item, grillSlotRect(s));
   }
-  // grill label
   ctx.fillStyle = PALETTE.muted;
   ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';

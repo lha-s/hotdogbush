@@ -47,9 +47,14 @@ export function tableSlotRect(slot: number): Rect {
 export const DOG_LANES = [0, 1, 2];
 export const BURGER_LANES = [3, 4, 5];
 
-// Fryer (one batch) and the two diagonal onion pans.
-export const FRYER = { slots: 1 } as const;
-const FRYER_SLOTS: Rect[] = [{ x: 104, y: 352, w: 206, h: 160 }];
+// Fryer: three fry-box slots along the bottom of the fryer zone (in front of the basket),
+// kept right of the Trash zone (x 6–137). Plus the two diagonal onion pans.
+export const FRYER = { slots: 3 } as const;
+const FRYER_SLOTS: Rect[] = [
+  { x: 142, y: 442, w: 52, h: 66 }, // fry box A
+  { x: 199, y: 442, w: 52, h: 66 }, // fry box B
+  { x: 256, y: 442, w: 52, h: 66 }, // fry box C
+];
 export function fryerSlotRect(slot: number): Rect {
   return FRYER_SLOTS[slot];
 }

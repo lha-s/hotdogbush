@@ -85,12 +85,19 @@ function friesPay(grade: Grade): number {
   return grade === 'perfect' ? PAYOUT.friesPerfect : grade === 'good' ? PAYOUT.friesGood : PAYOUT.friesOverdone;
 }
 
+const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
+
 /**
  * Ticket value for an assembled plate against an order. Mirrors the original economy:
  *   bun ($10) + sausage value, ketchup +$3 when wanted (−$2 when wanted but missing),
  *   drink +$7, plus a small combo bonus.
  */
-export function platePayout(plate: Plate, order: Order, combo: number): number {
+// NOTE: `patienceFrac` defaults to 0 (NOT 1) deliberately. The spec wording says
+// "default 1 for back-compat", but the existing platePayout tests assert exact
+// payouts with no speed bonus; defaulting to 1 would add +speedBonusMax to those
+// assertions and break them. Defaulting to 0 keeps all existing 3-arg callers
+// unchanged while letting new callers (and servePlate) opt into the speed tip.
+export function platePayout(plate: Plate, order: Order, combo: number, patienceFrac = 0): number {
   let pay = 0;
   if (plate.sausage) pay += PAYOUT.bun + gradePay(plate.sausage);
   if (plate.patty) pay += PAYOUT.burgerBun + gradePay(plate.patty);
@@ -100,6 +107,16 @@ export function platePayout(plate: Plate, order: Order, combo: number): number {
   if (order.onion) pay += plate.onion ? PAYOUT.onion : -PAYOUT.onionMiss;
   if (plate.drink) pay += PAYOUT.drink;
   pay += Math.min(combo, PAYOUT.comboMax) * PAYOUT.comboStep;
+
+  // Combo-meal bonus: only when the ORDER wants protein + fries + drink and the plate delivers all three.
+  const hasProteinWanted = order.sausage || order.burger;
+  const isComboMeal =
+    hasProteinWanted && order.fries && order.drink && (plate.sausage !== null || plate.patty !== null) && plate.fries !== null && plate.drink;
+  if (isComboMeal) pay += PAYOUT.comboMealBonus;
+
+  // Speed bonus: scales linearly with remaining patience (0 by default for back-compat).
+  pay += Math.round(PAYOUT.speedBonusMax * clamp01(patienceFrac));
+
   return Math.max(0, pay);
 }
 
@@ -114,14 +131,19 @@ function emptyPlate(over: Partial<Plate> = {}): Plate {
 /** Time-aware order generation: only includes items unlocked by `elapsed`. */
 export function generateOrder(rng: () => number = Math.random, elapsed = Infinity): Order {
   const useBurger = elapsed >= UNLOCK.burger && rng() < 0.45;
+  // Late-shift (PEAK/CRUNCH) orders skew richer so full combo meals appear more often.
+  const phase = phaseOf(elapsed);
+  const richer = phase === 'PEAK' || phase === 'CRUNCH';
+  const driveP = richer ? 0.65 : 0.4;
+  const friesP = richer ? 0.7 : 0.45;
   return {
     sausage: !useBurger,
     burger: useBurger,
     ketchup: rng() < 0.4,
     mustard: elapsed >= UNLOCK.mustard && rng() < 0.3,
     onion: elapsed >= UNLOCK.onion && useBurger && rng() < 0.4, // onions ride on burgers
-    drink: rng() < 0.4,
-    fries: elapsed >= UNLOCK.fries && rng() < 0.45,
+    drink: rng() < driveP,
+    fries: elapsed >= UNLOCK.fries && rng() < friesP,
   };
 }
 
@@ -354,7 +376,8 @@ export function servePlate(state: GameState, plateSlot: number, customerSlot: nu
     return { ok: false, payout: 0, reason: 'wrong-order' };
   }
 
-  const payout = platePayout(p, customer.order, state.combo);
+  const patienceFrac = customer.patienceMax > 0 ? customer.patience / customer.patienceMax : 0;
+  const payout = platePayout(p, customer.order, state.combo, patienceFrac);
   customer.served = true;
   state.combo += 1;
   state.served += 1;

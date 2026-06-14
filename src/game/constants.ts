@@ -54,8 +54,10 @@ export const PAYOUT = {
   friesOverdone: 3,
   onion: 4, // caramelised-onion topping when wanted
   onionMiss: 2, // penalty when the order wanted onion and didn't get it
-  comboStep: 1, // small streak bonus (our addition; gives the leaderboard more spread)
-  comboMax: 5,
+  comboStep: 2, // small streak bonus (our addition; gives the leaderboard more spread)
+  comboMax: 10,
+  speedBonusMax: 6, // max speed-tip cash awarded at full patience, scaling linearly to 0
+  comboMealBonus: 5, // bonus when a single plate satisfies protein + fries + drink
 } as const;
 
 // Item unlock schedule (seconds into the shift). Items don't appear in orders before this.

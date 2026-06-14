@@ -1,5 +1,5 @@
 import { sprite, type SpriteKey } from './assets.ts';
-import { APPLIANCE_COOK, BOARD, CASH, GRILL, PALETTE, TABLE } from './constants.ts';
+import { APPLIANCE_COOK, BOARD, CASH, GRILL, PALETTE, TABLE, UNLOCK } from './constants.ts';
 import { FRYER, PAN, STATION_RECTS, customerBubbleRect, customerSlotRect, fryerSlotRect, grillSlotRect, panSlotRect, tableSlotRect, targetAt } from './geometry.ts';
 import type { Rect } from './geometry.ts';
 import { gradeOfItem, isBurntItem } from './logic.ts';
@@ -521,6 +521,42 @@ function drawDragGhost(ctx: CanvasRenderingContext2D, state: GameState, drag: Dr
   ctx.restore();
 }
 
+// ---- unlock banners ----
+const BANNER_SECS = 3.0;
+
+/** Brief centered banner when an item unlocks. Pure render — no state mutation, derived from UNLOCK. */
+function drawUnlockBanners(ctx: CanvasRenderingContext2D, state: GameState): void {
+  const groups: Array<{ t: number; label: string }> = [
+    { t: UNLOCK.burger, label: 'BURGERS & MUSTARD UNLOCKED!' }, // burger & mustard share an unlock time
+    { t: UNLOCK.fries, label: 'FRIES & ONIONS UNLOCKED!' }, // fries & onions share an unlock time
+  ];
+  const active = groups.find((g) => state.elapsed >= g.t && state.elapsed < g.t + BANNER_SECS);
+  if (!active) return;
+
+  const age = state.elapsed - active.t;
+  const alpha = Math.max(0, Math.min(1, age > BANNER_SECS - 0.6 ? (BANNER_SECS - age) / 0.6 : 1));
+  const w = 360;
+  const h = 56;
+  const x = BOARD.width / 2 - w / 2;
+  const y = 152;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(20,14,9,0.85)';
+  roundRect(ctx, x, y, w, h, 14);
+  ctx.fill();
+  ctx.strokeStyle = PALETTE.mustard;
+  ctx.lineWidth = 3;
+  roundRect(ctx, x, y, w, h, 14);
+  ctx.stroke();
+  ctx.fillStyle = PALETTE.text;
+  ctx.font = '700 24px Arial Black, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(active.label, BOARD.width / 2, y + h / 2);
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------------------
 export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: ServeFx[], drag?: DragView | null): void {
   ctx.clearRect(0, 0, BOARD.width, BOARD.height);
@@ -542,6 +578,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, fx: Serv
     ctx.textBaseline = 'top';
     ctx.fillText(`🔥 ${state.combo}× combo`, BOARD.width - 12, 322);
   }
+
+  drawUnlockBanners(ctx, state);
 
   if (drag) {
     highlightTarget(ctx, drag);

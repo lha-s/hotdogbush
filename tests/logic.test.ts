@@ -227,7 +227,8 @@ describe('drag & drop assembly', () => {
     expect(s.plates[slot]?.patty).toBe('perfect');
     const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(true);
-    expect(res.payout).toBe(PAYOUT.burgerBun + PAYOUT.perfect);
+    // addCustomer seeds full patience, so the speed tip applies via servePlate.
+    expect(res.payout).toBe(PAYOUT.burgerBun + PAYOUT.perfect + PAYOUT.speedBonusMax);
   });
 
   test('a patty needs a burger bun, not a hot-dog bun', () => {
@@ -266,7 +267,7 @@ describe('serving + cash collection', () => {
     buildDog(s, slot);
     const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(true);
-    expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect);
+    expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect + PAYOUT.speedBonusMax);
     expect(s.cashTokens).toHaveLength(1);
     expect(s.cash).toBe(0);
     expect(s.pending).toBe(res.payout);
@@ -279,7 +280,7 @@ describe('serving + cash collection', () => {
     buildDog(s, slot);
     const res = servePlate(s, slot, 0);
     expect(res.ok).toBe(true);
-    expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect - PAYOUT.ketchupMiss);
+    expect(res.payout).toBe(PAYOUT.bun + PAYOUT.perfect - PAYOUT.ketchupMiss + PAYOUT.speedBonusMax);
   });
   test('wrong sausage/drink presence is rejected and breaks combo', () => {
     const s = playing();
@@ -308,8 +309,8 @@ describe('serving + cash collection', () => {
     servePlate(s, 0, 0);
     const tok = s.cashTokens[0];
     expect(tokenAt(s, tok.x, tok.y)?.id).toBe(tok.id);
-    expect(collectToken(s, tok.id)).toBe(PAYOUT.drink);
-    expect(s.cash).toBe(PAYOUT.drink);
+    expect(collectToken(s, tok.id)).toBe(PAYOUT.drink + PAYOUT.speedBonusMax);
+    expect(s.cash).toBe(PAYOUT.drink + PAYOUT.speedBonusMax);
     expect(s.pending).toBe(0);
   });
 });
@@ -408,7 +409,7 @@ describe('step / shift', () => {
     step(s, 1, () => 0);
     expect(s.timeLeft).toBe(0);
     expect(s.phase).toBe('gameover');
-    expect(s.cash).toBe(PAYOUT.drink);
+    expect(s.cash).toBe(PAYOUT.drink + PAYOUT.speedBonusMax);
   });
   test('uncollected cash expires before the buzzer', () => {
     const s = playing();
@@ -483,6 +484,91 @@ describe('speed-mode progression helpers', () => {
     expect(patienceFor(PHASES.PEAK)).toBe(PATIENCE.base - 2 * PATIENCE.perPhaseDrop);
     expect(patienceFor(PHASES.CRUNCH)).toBe(PATIENCE.min);
     expect(patienceFor(1000)).toBeGreaterThanOrEqual(PATIENCE.min);
+  });
+});
+
+describe('speed-based tips', () => {
+  const p = plate({ bun: true, sausage: 'perfect' });
+  const o = order({ sausage: true });
+  const base = PAYOUT.bun + PAYOUT.perfect;
+
+  test('full patience adds speedBonusMax', () => {
+    expect(platePayout(p, o, 0, 1)).toBe(base + PAYOUT.speedBonusMax);
+  });
+  test('scales linearly and rounds (0.5 -> 3)', () => {
+    expect(platePayout(p, o, 0, 0.5)).toBe(base + Math.round(PAYOUT.speedBonusMax * 0.5));
+  });
+  test('zero at no patience, clamps negatives and over-1', () => {
+    expect(platePayout(p, o, 0, 0)).toBe(base);
+    expect(platePayout(p, o, 0, -1)).toBe(base);
+    expect(platePayout(p, o, 0, 2)).toBe(base + PAYOUT.speedBonusMax);
+  });
+  test('back-compat: 3-arg call adds NO speed bonus', () => {
+    expect(platePayout(p, o, 0)).toBe(base);
+  });
+  test('servePlate passes through the patience fraction', () => {
+    const s1 = playing();
+    addCustomer(s1, { sausage: true });
+    s1.customers[0].patience = s1.customers[0].patienceMax; // full
+    const slot1 = placeBun(s1);
+    dropCookedOnPlate(s1, cookOne(s1, 10), slot1);
+    expect(servePlate(s1, slot1, 0).payout).toBe(base + PAYOUT.speedBonusMax);
+
+    const s2 = playing();
+    addCustomer(s2, { sausage: true });
+    s2.customers[0].patience = s2.customers[0].patienceMax / 2; // half
+    const slot2 = placeBun(s2);
+    dropCookedOnPlate(s2, cookOne(s2, 10), slot2);
+    expect(servePlate(s2, slot2, 0).payout).toBe(base + Math.round(PAYOUT.speedBonusMax * 0.5));
+  });
+});
+
+describe('combo curve buff', () => {
+  test('new combo constants', () => {
+    expect(PAYOUT.comboStep).toBe(2);
+    expect(PAYOUT.comboMax).toBe(10);
+  });
+  test('payout reflects the new curve and caps at comboMax', () => {
+    const p = plate({ bun: true, sausage: 'perfect' });
+    const o = order({ sausage: true });
+    const base = PAYOUT.bun + PAYOUT.perfect;
+    expect(platePayout(p, o, 10)).toBe(base + 10 * PAYOUT.comboStep);
+    expect(platePayout(p, o, 15)).toBe(base + PAYOUT.comboMax * PAYOUT.comboStep);
+  });
+});
+
+describe('combo-meal bonus', () => {
+  test('protein + fries + drink wanted and delivered adds comboMealBonus', () => {
+    const pay = platePayout(
+      plate({ bun: true, sausage: 'perfect', fries: 'perfect', drink: true }),
+      order({ sausage: true, fries: true, drink: true }),
+      0,
+    );
+    expect(pay).toBe(PAYOUT.bun + PAYOUT.perfect + PAYOUT.friesPerfect + PAYOUT.drink + PAYOUT.comboMealBonus);
+  });
+  test('not applied when fries missing from the order', () => {
+    const pay = platePayout(plate({ bun: true, sausage: 'perfect', drink: true }), order({ sausage: true, drink: true }), 0);
+    expect(pay).toBe(PAYOUT.bun + PAYOUT.perfect + PAYOUT.drink);
+  });
+  test('works for burger protein too', () => {
+    const pay = platePayout(
+      plate({ burgerBun: true, patty: 'perfect', fries: 'perfect', drink: true }),
+      order({ burger: true, fries: true, drink: true }),
+      0,
+    );
+    expect(pay).toBe(PAYOUT.burgerBun + PAYOUT.perfect + PAYOUT.friesPerfect + PAYOUT.drink + PAYOUT.comboMealBonus);
+  });
+});
+
+describe('richer orders in PEAK/CRUNCH', () => {
+  test('PEAK raises the drink probability vs WARMUP', () => {
+    expect(generateOrder(() => 0.6, PHASES.PEAK).drink).toBe(true); // 0.6 < 0.65
+    expect(generateOrder(() => 0.6, 0).drink).toBe(false); // 0.6 >= 0.4 (WARMUP unchanged)
+  });
+  test('regression: WARMUP fries/drink booleans unchanged at rng 0.5', () => {
+    const o = generateOrder(() => 0.5, 0);
+    expect(o.drink).toBe(false); // 0.5 >= 0.4
+    expect(o.fries).toBe(false); // gated by unlock at elapsed 0
   });
 });
 

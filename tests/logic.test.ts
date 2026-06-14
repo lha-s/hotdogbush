@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { BOARD, CASH, COOK, FRYER_COOK, GRILL, PAN_COOK, PATIENCE, PAYOUT, PHASES, SHIFT, SPAWN, TABLE, UNLOCK } from '../src/game/constants.ts';
 import {
   customerSlotRect,
+  FRYER,
   fryerSlotRect,
   grillSlotRect,
   panSlotRect,
@@ -159,7 +160,9 @@ describe('cook from the raw-ingredient sources (tap), not the grill', () => {
   test('clicking potatoes fills the fryer; clicking onions fills the pans', () => {
     const s = playing();
     expect(cookFries(s)).toBe(0);
-    expect(cookFries(s)).toBe(-1); // single fryer slot
+    expect(cookFries(s)).toBe(1);
+    expect(cookFries(s)).toBe(2);
+    expect(cookFries(s)).toBe(-1); // three fry-box slots
     expect(cookOnion(s)).toBe(0);
     expect(cookOnion(s)).toBe(1);
     expect(cookOnion(s)).toBe(-1); // two pans
@@ -515,11 +518,21 @@ describe('baked calibration layout', () => {
   test('every calibrated zone rect sits inside the board', () => {
     for (let i = 0; i < GRILL.slots; i++) expect(inBounds(grillSlotRect(i))).toBe(true);
     for (let i = 0; i < TABLE.slots; i++) expect(inBounds(tableSlotRect(i))).toBe(true);
-    expect(inBounds(fryerSlotRect(0))).toBe(true);
+    for (let i = 0; i < FRYER.slots; i++) expect(inBounds(fryerSlotRect(i))).toBe(true);
     expect(inBounds(panSlotRect(0))).toBe(true);
     expect(inBounds(panSlotRect(1))).toBe(true);
     for (let i = 0; i < CUSTOMER_MAX; i++) expect(inBounds(customerSlotRect(i))).toBe(true);
     for (const st of Object.keys(STATION_RECTS) as Station[]) expect(inBounds(STATION_RECTS[st])).toBe(true);
+  });
+
+  test('the three fry boxes clear the trash zone and the prep table', () => {
+    const trash = STATION_RECTS.trash;
+    const table0 = tableSlotRect(0);
+    for (let i = 0; i < FRYER.slots; i++) {
+      const box = fryerSlotRect(i);
+      expect(box.x).toBeGreaterThanOrEqual(trash.x + trash.w); // right of trash
+      expect(box.x + box.w).toBeLessThanOrEqual(table0.x); // left of the prep table
+    }
   });
 });
 const CUSTOMER_MAX = 5;
